@@ -11,7 +11,8 @@
 - Excel finance format applied: hardcoded=blue, formulas=black; LGT add-back cells tagged with line-item name. Verified colors + formula `=C-SUM(addbacks)` compute correctly.
 - Offline install bundled: `vendor/` has Windows wheels (Py 3.11–3.13 x64). `setup.bat` uses `--no-index --find-links vendor` with online fallback. Offline mechanism tested (fresh venv, no internet, imports OK).
 - Outputs are DRAFT/staging — copy table = 3-col A:C (Account No | Gross NAV | Net NAV), paste into master as VALUES. Documented in `HANDOFF.md` + README.
-- 4 commits on local `main` (no remote). Working tree clean.
+- Cleaned up: removed redundant `README_WINDOWS.md` (README.md covers Windows) and `.DS_Store`. Single README now.
+- 6 commits on local `main` (no remote). Working tree clean. `.venv/` kept on disk for Warren's Mac dev (gitignored, do not ship).
 
 ## How she runs it (Warren asked to be reminded — Windows)
 1. `setup.bat` once (offline install from `vendor/`).
