@@ -34,10 +34,17 @@ Excel finance format: hardcoded = BLUE font, formulas = BLACK.
 - `docs/STATEMENT_SPEC_TEMPLATE.md` — how colleague specifies layouts w/o sharing data.
 - `docs/FOR_COLLEAGUE_AI.md` — prompt for her AI to fill Account No (column A).
 
+## Runtime / handoff facts
+- Colleague runs on **Windows** → `.bat` launchers (`.command` are Mac, ignored).
+- Deps pre-bundled in `vendor/` (Windows wheels, Py 3.11–3.13 x64) → `setup.bat` installs
+  **offline** (`--no-index --find-links vendor`, online fallback). Recommend Python 3.12.
+- Outputs are a **DRAFT/staging** area, not her master file. Copy table = the 3-col A:C
+  block (Account No | Gross NAV | Net NAV); she pastes into her master as VALUES.
+- `HANDOFF.md` (root) = AI-readable handoff for the colleague.
+
 ## Open (see docs/STATUS.md)
 - Validate against real/dummy PDFs (multi-portfolio, multi-page, BoS non-zero liabilities).
-- Account No is blank (column A) → filled by colleague's AI for now.
-- Confirm colleague's OS (Mac vs Windows) — both supported.
+- Account No (column A) blank → next task: her AI fills it (`docs/FOR_COLLEAGUE_AI.md`).
 
 ## Run (dev)
 `python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt`
