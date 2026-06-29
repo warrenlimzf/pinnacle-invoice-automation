@@ -1,0 +1,5 @@
+# All libraries run fully offline. Nothing here sends data anywhere.
+pymupdf>=1.23      # read PDF text WITH positions, and render section screenshots
+openpyxl>=3.1      # read/write the Excel workbook
+python-docx>=1.1   # build the verification Word docs
+watchdog>=4.0      # watch the inbox folders for new PDFs

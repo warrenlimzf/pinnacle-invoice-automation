@@ -1,0 +1,17 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# ---- SENSITIVE: never commit client data or generated client artifacts ----
+banks/*/inbox/*.pdf
+banks/*/*_verification.docx
+output/*.xlsx
+logs/*.log
+logs/snapshots/
+processed_index.json
+
+# keep the empty folder structure though
+!banks/*/inbox/.gitkeep
+!output/.gitkeep
+!logs/.gitkeep

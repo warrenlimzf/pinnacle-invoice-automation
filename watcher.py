@@ -1,0 +1,100 @@
+"""Folder watcher — the automatic trigger.
+
+Keep this running (double-click run_watcher.bat on Windows). It watches the three
+inbox folders. The moment a PDF appears in one, it processes it for that bank.
+
+It also processes any PDFs already sitting in the inboxes when it starts, so
+nothing is missed if files were dropped while it was off.
+
+Stop it with Ctrl+C (or just close the window).
+"""
+import time
+from pathlib import Path
+
+from watchdog.events import FileSystemEventHandler
+from watchdog.observers import Observer
+
+import config
+from shared.index import already_processed, mark_processed
+from shared.logging_setup import get_logger
+from shared.process import process_pdf
+
+log = get_logger("watcher")
+
+
+def _wait_until_stable(path: Path, tries: int = 20, interval: float = 0.5) -> bool:
+    """Wait until the file size stops changing, i.e. the copy/download finished."""
+    last = -1
+    for _ in range(tries):
+        try:
+            size = path.stat().st_size
+        except FileNotFoundError:
+            return False
+        if size == last and size > 0:
+            return True
+        last = size
+        time.sleep(interval)
+    return True
+
+
+def handle(bank: str, path: Path) -> None:
+    path = Path(path)
+    if path.suffix.lower() != ".pdf":
+        return
+    if not _wait_until_stable(path):
+        return
+    if already_processed(path):
+        log.info(f"[{bank}] skip (already processed): {path.name}")
+        return
+    try:
+        log.info(f"[{bank}] processing {path.name}")
+        process_pdf(bank, path)
+        mark_processed(path)
+        log.info(f"[{bank}] done: {path.name}")
+    except PermissionError:
+        log.error(f"[{bank}] Excel/Word file is open — close {config.MASTER_WORKBOOK.name} "
+                  f"(and the {bank} .docx) and re-drop the PDF.")
+    except Exception:
+        log.exception(f"[{bank}] FAILED: {path.name}")
+
+
+class BankHandler(FileSystemEventHandler):
+    def __init__(self, bank: str):
+        self.bank = bank
+
+    def on_created(self, event):
+        if not event.is_directory:
+            handle(self.bank, Path(event.src_path))
+
+    def on_modified(self, event):
+        if not event.is_directory:
+            handle(self.bank, Path(event.src_path))
+
+
+def main():
+    observer = Observer()
+    for bank in config.BANKS:
+        inbox = config.inbox_dir(bank)
+        inbox.mkdir(parents=True, exist_ok=True)
+        observer.schedule(BankHandler(bank), str(inbox), recursive=False)
+        log.info(f"Watching: {inbox}")
+
+    # catch up on anything already waiting
+    for bank in config.BANKS:
+        for pdf in sorted(config.inbox_dir(bank).glob("*.pdf")):
+            handle(bank, pdf)
+
+    observer.start()
+    log.info("Watcher running. Drop statement PDFs into the bank inbox folders. "
+             "Press Ctrl+C to stop.")
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        log.info("Stopping watcher...")
+        observer.stop()
+    observer.join()
+
+
+if __name__ == "__main__":
+    main()
