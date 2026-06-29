@@ -17,3 +17,6 @@ processed_index.json
 !banks/*/inbox/.gitkeep
 !output/.gitkeep
 !logs/.gitkeep
+
+# macOS
+.DS_Store
