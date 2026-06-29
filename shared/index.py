@@ -1,8 +1,12 @@
 """Remembers which PDFs were already processed, so nothing is done twice.
 
 We key on the file's CONTENT (a SHA-1 hash), not its name. That means:
-- dropping the exact same file again -> skipped
+- the watcher's catch-up at startup skips files already done (no needless redo)
 - dropping a CORRECTED version (different content) -> processed again
+- deliberately re-dropping a file into an inbox (delete it, copy it back) DOES
+  re-process it -> the watcher treats a fresh drop as "redo this" (see watcher.py),
+  and `run_all_once.py --redo` forces a full rebuild. Re-doing is safe: it just
+  overwrites that file's existing row in the Excel.
 
 IMPORTANT: this never moves or deletes your colleague's statement PDFs. The
 originals always stay exactly where she put them.

@@ -27,7 +27,7 @@ def verification_docx(bank: str) -> Path:
 
 # --- Shared outputs ---------------------------------------------------------
 OUTPUT_DIR = ROOT / "output"
-MASTER_WORKBOOK = OUTPUT_DIR / "fees_master.xlsx"   # one workbook, 3 tabs
+MASTER_WORKBOOK = OUTPUT_DIR / "nav_master.xlsx"    # one workbook, 3 tabs
 LOGS_DIR = ROOT / "logs"
 SNAPSHOT_DIR = LOGS_DIR / "snapshots"               # PNG crops kept for reference
 PROCESSED_INDEX = ROOT / "processed_index.json"     # remembers what was already done

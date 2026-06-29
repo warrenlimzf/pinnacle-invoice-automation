@@ -5,6 +5,11 @@ re-run a batch. Already-processed files (same content) are skipped automatically
 
   python run_all_once.py            # process all three banks
   python run_all_once.py LGT        # process only one bank
+  python run_all_once.py --redo     # re-do EVERYTHING, even already-processed
+  python run_all_once.py LGT --redo # re-do just one bank
+
+Use --redo if you deleted rows in the Excel by mistake and want them rebuilt
+from the PDFs still sitting in the inbox folders.
 """
 import sys
 
@@ -17,11 +22,12 @@ log = get_logger("run_all_once")
 
 
 def main(argv):
+    redo = "--redo" in argv
     banks = [b for b in argv if b in config.BANKS] or config.BANKS
     total = 0
     for bank in banks:
         for pdf in sorted(config.inbox_dir(bank).glob("*.pdf")):
-            if already_processed(pdf):
+            if not redo and already_processed(pdf):
                 log.info(f"[{bank}] skip (already processed): {pdf.name}")
                 continue
             try:
