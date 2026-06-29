@@ -1,18 +1,22 @@
-"""Fee calculation. PLACEHOLDER.
+"""The 'LGT fee formula' — i.e. reconstructing Gross NAV from Net NAV + add-backs.
 
-We agreed to define the real rule once we look at a real statement together.
-Right now, if MGMT_FEE_RATE is left as None in config.py, the Fee column simply
-stays blank — the rest of the pipeline (Gross/Net NAV + screenshots) still works.
+LGT statements show only ONE total (the Net NAV). Several line items are negative
+(e.g. Credit, Derivatives). Gross NAV = Net NAV with those negatives added back:
+
+    Gross = Net - (sum of the negative line items)
+          = Net + (their absolute value)
+
+In Excel this is written as a live FORMULA (not a hardcoded number) so your
+colleague can audit it. This module computes the same value in Python purely so
+the Word verification doc can display the resulting Gross number too.
 """
-from typing import Optional
+from typing import List, Optional
 
-import config
-from shared.model import ClientResult
+from shared.model import AddBack
 
 
-def calculate_fee(result: ClientResult) -> Optional[float]:
-    # TODO(with sample): replace with your colleague's real fee rule, e.g.
-    #   return round(result.net_nav * config.MGMT_FEE_RATE, 2)
-    if config.MGMT_FEE_RATE is None or result.net_nav is None:
+def gross_from_addbacks(net_nav: Optional[float],
+                        addbacks: List[AddBack]) -> Optional[float]:
+    if net_nav is None:
         return None
-    return round(result.net_nav * config.MGMT_FEE_RATE, 2)
+    return round(net_nav - sum(a.value for a in addbacks), 2)

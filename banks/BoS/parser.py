@@ -1,46 +1,47 @@
-"""Bank of Singapore (BoS) statement parser — one of the 3 distinct per-bank scripts.
+"""Bank of Singapore (BoS) statement parser.
 
-PLACEHOLDER. Runs end-to-end but the label wording and client-name logic are
-GUESSES and MUST be checked against a real BoS sample.
-
-To finish this for BoS, once we have a sample PDF:
-  1. Confirm exactly how "Gross NAV" / "Net NAV" are written -> update *_LABELS.
-  2. Confirm how the client is identified -> update _extract_client().
-  3. Confirm the fee rule -> shared/fees.py + config.MGMT_FEE_RATE.
+Layout (from the sample):
+    Assets                 10,208,537.88   100.00     <- Gross AUM (the 100.00% row)
+    ...breakdown...
+    Liabilities             0.00            0.00
+    Total Net Asset Value  10,208,537.88              <- Net AUM (bottom)
+When Liabilities are 0, Gross == Net. Otherwise the top 'Assets' row is Gross and
+the bottom 'Total Net Asset Value' is Net.
 """
-from pathlib import Path
 from typing import List
 
-from shared.extract import find_label_value
-from shared.fees import calculate_fee
+from shared.extract import (find_line_label_eq, find_line_text_contains,
+                            first_amount, group_lines)
 from shared.model import ClientResult, FieldHit
 from shared.readers.pdf_reader import PdfReader
 
-# TODO(BoS sample): adjust to Bank of Singapore's exact wording.
-GROSS_LABELS = ["gross nav", "gross net asset value", "gross asset value"]
-NET_LABELS = ["net nav", "net asset value"]
-
 
 def parse(pdf_path) -> List[ClientResult]:
-    reader = PdfReader()
-    items = reader.extract_text_items(pdf_path)
+    lines = group_lines(PdfReader().extract_text_items(pdf_path))
+    res = ClientResult(source_pdf=str(pdf_path))
 
-    client = _extract_client(pdf_path, reader)
+    # Gross = the row whose label is exactly "Assets" (the 100.00% row).
+    gross_line = find_line_label_eq(lines, "Assets")
+    # Net = the "Total Net Asset Value" row.
+    net_line = find_line_text_contains(lines, "total net asset value", "net asset value")
 
-    gross_v, gross_pg, gross_box = find_label_value(items, GROSS_LABELS)
-    net_v, net_pg, net_box = find_label_value(items, NET_LABELS)
+    if gross_line:
+        amt = first_amount(gross_line)       # first number = value (second = the %)
+        if amt:
+            res.gross_nav, box = amt
+            res.hits.append(FieldHit("Gross NAV (Assets)", res.gross_nav,
+                                     gross_line["page"],
+                                     (gross_line["x0"], gross_line["y0"], box[2], box[3])))
+    if net_line:
+        amt = first_amount(net_line)
+        if amt:
+            res.net_nav, box = amt
+            res.hits.append(FieldHit("Net NAV (Total Net Asset Value)", res.net_nav,
+                                     net_line["page"],
+                                     (net_line["x0"], net_line["y0"], box[2], box[3])))
 
-    result = ClientResult(client=client, gross_nav=gross_v, net_nav=net_v,
-                          source_pdf=str(pdf_path))
-    if gross_pg is not None:
-        result.hits.append(FieldHit("Gross NAV", gross_v, gross_pg, gross_box))
-    if net_pg is not None:
-        result.hits.append(FieldHit("Net NAV", net_v, net_pg, net_box))
-
-    result.fee = calculate_fee(result)
-    return [result]
-
-
-def _extract_client(pdf_path, reader) -> str:
-    # TODO(BoS sample): replace with real client-name extraction from the PDF.
-    return Path(pdf_path).stem
+    if res.gross_nav is None:
+        res.flags.append("Gross NAV not found (expected an 'Assets' row)")
+    if res.net_nav is None:
+        res.flags.append("Net NAV not found (expected 'Total Net Asset Value')")
+    return [res]

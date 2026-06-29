@@ -5,6 +5,8 @@ __pycache__/
 
 # ---- SENSITIVE: never commit client data or generated client artifacts ----
 banks/*/inbox/*.pdf
+# sample figure crops kept locally for reference, not committed (may show real figures)
+invoice examples/
 banks/*/*_verification.docx
 output/*.xlsx
 logs/*.log

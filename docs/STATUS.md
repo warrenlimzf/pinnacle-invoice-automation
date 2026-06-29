@@ -1,20 +1,30 @@
 # STATUS
 
-## Done (scaffold, runs end-to-end)
-- Folder structure: 3 banks (LGT, BoS, UBS), each with `inbox/` + its own `parser.py`.
-- Folder-watch trigger (`watcher.py`) + manual run (`run_all_once.py`) + Windows `.bat`s.
-- Pipeline: PDF → extract Gross/Net NAV → master Excel (3 tabs) → section screenshot → per-bank `.docx`.
-- Screenshots are local via PyMuPDF (NOT MinerU — MinerU uploads to cloud; data must stay local).
-- File-safety: originals never moved/deleted; de-dupe by content hash (`processed_index.json`).
+## Done & verified (against synthetic PDFs that replicate the 3 real sample layouts)
+- 3 banks (LGT, BoS, UBS), each with `inbox/` + its own real `parser.py`.
+- Folder-watch trigger (`watcher.py`) + manual run (`run_all_once.py`).
+- Launchers for BOTH OSes: `*.command` (Mac) and `*.bat` (Windows).
+- Pipeline: PDF → Gross/Net NAV → master Excel (3 tabs) → section screenshot → per-bank `.docx`.
+- Local-only screenshots via PyMuPDF (NOT MinerU — MinerU uploads to cloud).
+- File-safety: originals never moved/deleted; de-dupe by content hash.
 
-## Open — needs ONE real (or redacted) sample PDF per bank
-1. **Label wording** — confirm how each bank prints "Gross NAV" / "Net NAV";
-   update `GROSS_LABELS` / `NET_LABELS` in each `banks/*/parser.py`.
-2. **Client name** — confirm where the client is identified on the statement;
-   update `_extract_client()` (currently falls back to the file name).
-3. **Fee rule** — define with the colleague; set in `shared/fees.py` + `config.MGMT_FEE_RATE`.
-4. **Multiple clients per PDF?** — current parsers assume one client per PDF. If a
-   statement covers many clients, `parse()` should return several `ClientResult`s.
+## Extraction logic (real, not placeholder)
+- **UBS** — reads "Total gross assets" / "Total net assets"; handles SPACE thousands + SGD prefix.
+- **BoS** — Gross = the "Assets" (100%) row; Net = "Total Net Asset Value". Net=Gross when liabilities 0.
+- **LGT** — Net = "Total"; finds negative line items; Gross = live Excel formula `=Net-SUM(addbacks)`.
+- Finance formatting: hardcoded = BLUE, formulas = BLACK. Add-back cells tagged with line-item name.
+
+## Open
+1. **Validate against real layouts** — confirm via dummy/redacted PDFs or the colleague's
+   answers in `docs/STATEMENT_SPEC_TEMPLATE.md` (esp. multi-portfolio PDFs, multi-page,
+   exact label wording, BoS non-zero-liability case).
+2. **Account No (column A)** — currently blank; filled by colleague's own AI via
+   `docs/FOR_COLLEAGUE_AI.md`. Could be automated once we know where it sits on each statement.
+3. **Multiple clients per PDF** — parsers currently assume one account per PDF.
 
 ## Deferred (placeholders left in)
-- Email ingestion / other file formats — add a new reader in `shared/readers/`.
+- Email ingestion / more file formats — add a new reader in `shared/readers/`.
+
+## Open question for Warren
+- Which OS does the colleague actually run on — Mac or Windows? (Both are supported; this
+  only changes which launcher + auto-start instructions to point her to.)

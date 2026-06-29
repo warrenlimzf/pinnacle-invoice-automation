@@ -1,48 +1,74 @@
-"""LGT statement parser — one of the 3 distinct per-bank scripts.
+"""LGT statement parser.
 
-PLACEHOLDER. It already runs end-to-end (reads the PDF, finds candidate Gross/Net
-NAV values, screenshots them, writes to Excel + docx). But the label wording and
-client-name logic below are GUESSES and MUST be checked against a real LGT sample.
+Layout (from the sample) — 'Statement of assets':
+    Asset allocation/currency        Amount in USD
+    Liquidity                          223,742.84
+    Credit                          -1,109,240.85     <- negative line item
+    Short-term investments              13,688.06
+    Bonds                              949,128.55
+    Equities                         2,010,656.06
+    Hedge funds                        162,304.32
+    Derivatives                        -35,864.31     <- negative line item
+    Total                            2,214,414.67     <- this is NET NAV
 
-To finish this for LGT, once we have a sample PDF:
-  1. Confirm exactly how "Gross NAV" / "Net NAV" are written -> update *_LABELS.
-  2. Confirm how the client is identified -> update _extract_client().
-  3. Confirm the fee rule -> shared/fees.py + config.MGMT_FEE_RATE.
+LGT shows only the Net NAV (the Total). Gross NAV is reconstructed by adding back
+the negative line items, written into Excel as a live formula (see shared/fees.py).
 """
-from pathlib import Path
 from typing import List
 
-from shared.extract import find_label_value
-from shared.fees import calculate_fee
-from shared.model import ClientResult, FieldHit
+from shared.extract import (amounts_in_line, find_line_label_eq, first_amount,
+                            group_lines, line_label, union_bbox)
+from shared.fees import gross_from_addbacks
+from shared.model import AddBack, ClientResult, FieldHit
 from shared.readers.pdf_reader import PdfReader
 
-# TODO(LGT sample): adjust to LGT's exact wording.
-GROSS_LABELS = ["gross nav", "gross net asset value", "gross asset value"]
-NET_LABELS = ["net nav", "net asset value"]
+# Header that marks the top of the asset-allocation list.
+_HEADER_HINTS = ("amount in", "asset allocation/currency")
 
 
 def parse(pdf_path) -> List[ClientResult]:
-    reader = PdfReader()
-    items = reader.extract_text_items(pdf_path)
+    lines = group_lines(PdfReader().extract_text_items(pdf_path))
+    res = ClientResult(source_pdf=str(pdf_path), gross_is_formula=True)
 
-    client = _extract_client(pdf_path, reader)
+    total_line = find_line_label_eq(lines, "Total")
+    if total_line:
+        amt = first_amount(total_line)
+        if amt:
+            res.net_nav = amt[0]
 
-    gross_v, gross_pg, gross_box = find_label_value(items, GROSS_LABELS)
-    net_v, net_pg, net_box = find_label_value(items, NET_LABELS)
+    # The allocation rows live between the header and the Total line, same page.
+    header_line = next(
+        (ln for ln in lines if any(h in ln["text"].lower() for h in _HEADER_HINTS)),
+        None,
+    )
+    if total_line and header_line:
+        page = total_line["page"]
+        top_y, bot_y = header_line["y1"], total_line["y0"]
+        item_boxes = []
+        for ln in lines:
+            if ln["page"] != page or not (top_y < ln["y0"] < bot_y):
+                continue
+            amts = amounts_in_line(ln)
+            if not amts:
+                continue
+            value, box = amts[0]
+            item_boxes.append((ln["x0"], ln["y0"], box[2], box[3]))
+            if value < 0:                       # a negative line item -> add it back
+                res.addbacks.append(AddBack(label=line_label(ln) or "item", value=value))
 
-    result = ClientResult(client=client, gross_nav=gross_v, net_nav=net_v,
-                          source_pdf=str(pdf_path))
-    if gross_pg is not None:
-        result.hits.append(FieldHit("Gross NAV", gross_v, gross_pg, gross_box))
-    if net_pg is not None:
-        result.hits.append(FieldHit("Net NAV", net_v, net_pg, net_box))
+        # Screenshot the WHOLE allocation table so she can eyeball all add-backs.
+        table_box = union_bbox(
+            (header_line["x0"], header_line["y0"], header_line["x1"], header_line["y1"]),
+            (total_line["x0"], total_line["y0"], total_line["x1"], total_line["y1"]),
+            *item_boxes,
+        )
+        res.hits.append(FieldHit("Net NAV (Total) & add-back items",
+                                 res.net_nav, page, table_box))
 
-    result.fee = calculate_fee(result)
-    return [result]
+    res.gross_nav = gross_from_addbacks(res.net_nav, res.addbacks)  # for docx display
 
-
-def _extract_client(pdf_path, reader) -> str:
-    # TODO(LGT sample): replace with real client-name extraction from the PDF.
-    # For now we use the file name so the pipeline produces visible output.
-    return Path(pdf_path).stem
+    if res.net_nav is None:
+        res.flags.append("Net NAV not found (expected a 'Total' row)")
+    if not res.addbacks:
+        res.flags.append("No negative line items found — Gross will equal Net")
+    return [res]

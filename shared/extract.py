@@ -1,87 +1,175 @@
-"""Generic helpers the bank parsers share.
+"""Text/number extraction helpers shared by the three bank parsers.
 
-PLACEHOLDER HEURISTICS. `find_label_value` is a reasonable first guess: it looks
-for a label like "Net NAV" on the page and grabs the nearest number to its right
-on the same line. Once we have a real statement from each bank, we refine the
-label wording (and, if needed, the geometry) in each bank's parser.
+Handles the real-world number formats seen in the sample statements:
+  - comma thousands + dot decimal     10,208,537.88   -1,109,240.85   (BoS, LGT)
+  - SPACE thousands                   SGD 7 032 282                   (UBS)
+  - parentheses or leading minus for negatives
 """
 import re
 from typing import Dict, List, Optional, Tuple
 
-# Matches numbers like 1,234,567.89  or  -1234.5  or  12,345
-_NUM_RE = re.compile(r"^[-+(]?[\d,]*\.?\d+\)?$")
+from shared.model import BBox
+
+Y_TOL = 3.0  # points: tokens within this vertical distance are the same line
+
+_CURRENCIES = {"SGD", "USD", "EUR", "GBP", "HKD", "CHF", "JPY", "AUD", "CNY", "CNH"}
+_DATE_RE = re.compile(r"^\d{1,4}[.\-/]\d{1,2}[.\-/]\d{1,4}$")   # 31.12.2024 etc.
+_NUM_START_RE = re.compile(r"^[(\-−]?\d")                  # token begins a number
+_THOUSAND_GROUP_RE = re.compile(r"^\d{3}$")                     # "032", "282"
 
 
-def to_float(token: str) -> Optional[float]:
-    """Turn a statement number string into a float. Handles commas, and
-    parentheses/CR meaning negative. Returns None if it isn't a number."""
-    if token is None:
+# --------------------------------------------------------------------------- #
+#  Number parsing
+# --------------------------------------------------------------------------- #
+def parse_amount(text: str) -> Optional[float]:
+    """Turn a money string into a float. Handles spaces/commas as thousand
+    separators, '.' as decimal, and () or leading - as negative."""
+    if text is None:
         return None
-    s = token.strip()
-    neg = s.startswith("(") and s.endswith(")")
-    s = s.replace("(", "").replace(")", "").replace(",", "").replace("+", "").strip()
-    try:
-        val = float(s)
-    except ValueError:
+    s = text.strip()
+    for cur in _CURRENCIES:
+        s = s.replace(cur, "")
+    s = s.replace("*", "").replace("−", "-").strip()
+
+    neg = False
+    if s.startswith("(") and s.endswith(")"):
+        neg, s = True, s[1:-1]
+    if s.startswith("-"):
+        neg, s = True, s[1:]
+
+    s = s.replace(" ", "").replace(",", "").replace("+", "").strip()
+    m = re.search(r"\d+(?:\.\d+)?", s)
+    if not m:
         return None
+    val = float(m.group())
     return -val if neg else val
 
 
-def find_label_value(
-    items: List[Dict],
-    label_variants: List[str],
-    y_tol: float = 3.5,
-) -> Tuple[Optional[float], Optional[int], Optional[Tuple[float, float, float, float]]]:
-    """Find a label and return (value, page, bbox).
+def _is_date(text: str) -> bool:
+    return bool(_DATE_RE.match(text.strip()))
 
-    - value: the number read just after the label (or None if no number found)
-    - page:  0-based page index where the label is
-    - bbox:  rectangle covering the label + the number, for screenshotting
 
-    Returns (None, None, None) if the label isn't found at all.
+# --------------------------------------------------------------------------- #
+#  Line grouping
+# --------------------------------------------------------------------------- #
+def _mk_line(page: int, tokens: List[Dict]) -> Dict:
+    tokens = sorted(tokens, key=lambda t: t["x0"])
+    return {
+        "page": page,
+        "tokens": tokens,
+        "text": " ".join(t["text"] for t in tokens),
+        "x0": min(t["x0"] for t in tokens),
+        "y0": min(t["y0"] for t in tokens),
+        "x1": max(t["x1"] for t in tokens),
+        "y1": max(t["y1"] for t in tokens),
+    }
+
+
+def group_lines(items: List[Dict]) -> List[Dict]:
+    """Group positioned word-items into reading lines (one dict per visual row)."""
+    by_page: Dict[int, List[Dict]] = {}
+    for it in items:
+        by_page.setdefault(it["page"], []).append(it)
+
+    lines: List[Dict] = []
+    for page in sorted(by_page):
+        toks = sorted(by_page[page], key=lambda t: (t["y0"], t["x0"]))
+        bucket: List[Dict] = []
+        base_y = None
+        for t in toks:
+            if base_y is None or abs(t["y0"] - base_y) <= Y_TOL:
+                bucket.append(t)
+                base_y = t["y0"] if base_y is None else base_y
+            else:
+                lines.append(_mk_line(page, bucket))
+                bucket, base_y = [t], t["y0"]
+        if bucket:
+            lines.append(_mk_line(page, bucket))
+    return lines
+
+
+def line_label(line: Dict) -> str:
+    """The leading text label of a line (everything before the first number)."""
+    words = []
+    for t in line["tokens"]:
+        if _NUM_START_RE.match(t["text"]) and not _is_date(t["text"]):
+            break
+        words.append(t["text"])
+    return " ".join(words).strip()
+
+
+# --------------------------------------------------------------------------- #
+#  Amount extraction within a line
+# --------------------------------------------------------------------------- #
+def amounts_in_line(line: Dict) -> List[Tuple[float, BBox]]:
+    """Return every number on the line, left to right, as (value, bbox).
+
+    Merges space-separated thousand groups ("7","032","282" -> 7032282) and
+    skips date-like tokens.
     """
-    variants = [v.lower() for v in label_variants]
+    toks = line["tokens"]
+    out: List[Tuple[float, BBox]] = []
+    i = 0
+    while i < len(toks):
+        t = toks[i]
+        if _is_date(t["text"]) or not _NUM_START_RE.match(t["text"]):
+            i += 1
+            continue
+        group = [t]
+        j = i + 1
+        while (j < len(toks)
+               and _THOUSAND_GROUP_RE.match(toks[j]["text"])
+               and (toks[j]["x0"] - group[-1]["x1"]) < 12):
+            group.append(toks[j])
+            j += 1
+        val = parse_amount("".join(g["text"] for g in group))
+        if val is not None:
+            bbox = (min(g["x0"] for g in group), min(g["y0"] for g in group),
+                    max(g["x1"] for g in group), max(g["y1"] for g in group))
+            out.append((val, bbox))
+        i = j
+    return out
 
-    for variant in variants:
-        parts = variant.split()
-        n = len(parts)
-        pages = sorted({it["page"] for it in items})
 
-        for page in pages:
-            page_items = [it for it in items if it["page"] == page]
-            # reading order: top-to-bottom, then left-to-right
-            page_items.sort(key=lambda it: (round(it["y0"], 1), it["x0"]))
+def first_amount(line: Dict) -> Optional[Tuple[float, BBox]]:
+    amts = amounts_in_line(line)
+    return amts[0] if amts else None
 
-            for i in range(len(page_items) - n + 1):
-                window = page_items[i:i + n]
-                words = [w["text"].lower().strip(":").strip() for w in window]
-                if words != parts:
-                    continue
 
-                # label found — its bounding rectangle
-                lx0 = min(w["x0"] for w in window)
-                ly0 = min(w["y0"] for w in window)
-                lx1 = max(w["x1"] for w in window)
-                ly1 = max(w["y1"] for w in window)
+def amount_after_currency(line: Dict) -> Optional[Tuple[float, BBox]]:
+    """For UBS-style 'label ... SGD 7 032 282': the amount after the currency code."""
+    toks = line["tokens"]
+    cur_idx = next((k for k, t in enumerate(toks)
+                    if t["text"].upper() in _CURRENCIES), None)
+    if cur_idx is None:
+        return first_amount(line)
+    sub = _mk_line(line["page"], toks[cur_idx + 1:])
+    return first_amount(sub)
 
-                # look for a number to the RIGHT of the label, same line
-                same_line = [
-                    it for it in page_items
-                    if it["x0"] >= lx1 - 1 and abs(it["y0"] - ly0) <= y_tol
-                ]
-                same_line.sort(key=lambda it: it["x0"])
-                for cand in same_line:
-                    if _NUM_RE.match(cand["text"].replace(",", "x").replace("x", ",")):
-                        val = to_float(cand["text"])
-                        if val is not None:
-                            bbox = (
-                                min(lx0, cand["x0"]), min(ly0, cand["y0"]),
-                                max(lx1, cand["x1"]), max(ly1, cand["y1"]),
-                            )
-                            return val, page, bbox
 
-                # label found but no number beside it — still return the label
-                # region so the screenshot shows the area for a human to check.
-                return None, page, (lx0, ly0, lx1, ly1)
+# --------------------------------------------------------------------------- #
+#  Line finders
+# --------------------------------------------------------------------------- #
+def find_line_label_eq(lines: List[Dict], *labels: str) -> Optional[Dict]:
+    """First line whose leading label equals one of `labels` (case-insensitive)."""
+    wanted = {l.lower() for l in labels}
+    for line in lines:
+        if line_label(line).lower().strip(" :*") in wanted:
+            return line
+    return None
 
-    return None, None, None
+
+def find_line_text_contains(lines: List[Dict], *needles: str) -> Optional[Dict]:
+    """First line whose full text contains one of `needles` (case-insensitive)."""
+    low = [n.lower() for n in needles]
+    for line in lines:
+        text = line["text"].lower()
+        if any(n in text for n in low):
+            return line
+    return None
+
+
+def union_bbox(*boxes: BBox) -> BBox:
+    boxes = [b for b in boxes if b]
+    return (min(b[0] for b in boxes), min(b[1] for b in boxes),
+            max(b[2] for b in boxes), max(b[3] for b in boxes))

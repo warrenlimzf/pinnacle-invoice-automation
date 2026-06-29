@@ -1,15 +1,41 @@
-"""Owns the master workbook (output/fees_master.xlsx) with one tab per bank.
+"""Owns the master workbook (output/fees_master.xlsx) — one tab per bank.
 
-Each row is one client. Re-processing the same client UPDATES that client's row
-rather than adding a duplicate (matched on the Client name).
+Finance convention (as requested):
+  - HARDCODED values (read straight off the PDF) are BLUE
+  - FORMULA cells (e.g. LGT's reconstructed Gross NAV) are BLACK
+
+Each row = one statement PDF. Re-processing the same file UPDATES its row.
+The Account No column is left blank for the colleague's own AI to fill in.
 """
 from datetime import datetime
 from pathlib import Path
 from typing import List
 
 from openpyxl import Workbook, load_workbook
+from openpyxl.comments import Comment
+from openpyxl.styles import Font
+from openpyxl.utils import get_column_letter
 
-HEADERS = ["Client", "Gross NAV", "Net NAV", "Fee", "Source PDF", "Page", "Updated At"]
+from shared.model import ClientResult
+
+# Column layout (1-based)
+COL_ACCOUNT = 1   # A
+COL_GROSS = 2     # B
+COL_NET = 3       # C
+COL_SOURCE = 4    # D
+COL_PAGE = 5      # E
+COL_UPDATED = 6   # F
+COL_FLAGS = 7     # G
+ADDBACK_START = 9         # I onwards (LGT add-back line items)
+ADDBACK_CLEAR_TO = 24     # clear up to col X when updating a row
+
+HEADERS = ["Account No", "Gross NAV", "Net NAV", "Source PDF", "Page",
+           "Updated At", "Flags"]
+
+NUM_FMT = "#,##0.00"
+BLUE = Font(color="FF0000FF")      # hardcoded inputs
+BLACK = Font(color="FF000000")     # formulas / computed
+BOLD = Font(bold=True)
 
 
 def _ensure_workbook(path: Path, banks: List[str]) -> Workbook:
@@ -17,47 +43,82 @@ def _ensure_workbook(path: Path, banks: List[str]) -> Workbook:
         wb = load_workbook(path)
     else:
         wb = Workbook()
-        wb.remove(wb.active)  # drop the default empty sheet
+        wb.remove(wb.active)
     for bank in banks:
         if bank not in wb.sheetnames:
             ws = wb.create_sheet(title=bank)
-            ws.append(HEADERS)
+            for c, head in enumerate(HEADERS, start=1):
+                cell = ws.cell(row=1, column=c, value=head)
+                cell.font = BOLD
+            if bank == "LGT":
+                note = ws.cell(row=1, column=ADDBACK_START,
+                               value="LGT add-back line items (negative figures) — "
+                                     "Gross NAV = Net NAV minus these →")
+                note.font = BOLD
     return wb
 
 
-def write_record(path, bank: str, banks: List[str], record: dict) -> None:
-    """Insert or update one client row in the given bank's tab.
+def _find_row(ws, source_name: str):
+    for r in range(2, ws.max_row + 1):
+        if str(ws.cell(row=r, column=COL_SOURCE).value or "").strip() == source_name:
+            return r
+    return None
 
-    Raises PermissionError if the workbook is currently open in Excel (Windows
-    locks the file). The caller logs this clearly and the file is retried later.
-    """
+
+def write_result(path, bank: str, banks: List[str],
+                 result: ClientResult, page) -> None:
+    """Insert/update one statement's row. Raises PermissionError if the workbook
+    is open in Excel (Windows locks it) — caller logs and retries later."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     wb = _ensure_workbook(path, banks)
     ws = wb[bank]
 
-    new_row = [
-        record.get("client"),
-        record.get("gross_nav"),
-        record.get("net_nav"),
-        record.get("fee"),
-        record.get("source_pdf"),
-        record.get("page"),
-        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-    ]
+    source_name = Path(result.source_pdf).name
+    r = _find_row(ws, source_name) or (ws.max_row + 1)
 
-    client_key = str(record.get("client", "")).strip().lower()
-    found_row = None
-    for r in range(2, ws.max_row + 1):
-        existing = ws.cell(row=r, column=1).value
-        if existing is not None and str(existing).strip().lower() == client_key:
-            found_row = r
-            break
+    # Account No — only set if we have it; never overwrite a value she/AI filled.
+    if result.account_no:
+        ws.cell(row=r, column=COL_ACCOUNT, value=result.account_no).font = BLUE
 
-    if found_row:
-        for col, value in enumerate(new_row, start=1):
-            ws.cell(row=found_row, column=col, value=value)
+    # Net NAV — always hardcoded blue.
+    if result.net_nav is not None:
+        c = ws.cell(row=r, column=COL_NET, value=result.net_nav)
+        c.font, c.number_format = BLUE, NUM_FMT
+
+    # clear any stale add-back cells from a previous run of this row
+    for col in range(ADDBACK_START, ADDBACK_CLEAR_TO + 1):
+        cell = ws.cell(row=r, column=col)
+        cell.value, cell.comment = None, None
+
+    if result.gross_is_formula:
+        # LGT: write each add-back (blue, with its label as a comment), then a
+        # live formula for Gross = Net - SUM(add-backs).
+        last_col = None
+        for i, ab in enumerate(result.addbacks):
+            col = ADDBACK_START + i
+            cell = ws.cell(row=r, column=col, value=ab.value)
+            cell.font, cell.number_format = BLUE, NUM_FMT
+            cell.comment = Comment(f"{ab.label}", "automation")
+            last_col = col
+        net_ref = f"{get_column_letter(COL_NET)}{r}"
+        if last_col:
+            rng = f"{get_column_letter(ADDBACK_START)}{r}:{get_column_letter(last_col)}{r}"
+            formula = f"={net_ref}-SUM({rng})"
+        else:
+            formula = f"={net_ref}"   # no negatives -> Gross = Net
+        g = ws.cell(row=r, column=COL_GROSS, value=formula)
+        g.font, g.number_format = BLACK, NUM_FMT
     else:
-        ws.append(new_row)
+        # UBS / BoS: Gross is read straight off the PDF -> hardcoded blue.
+        if result.gross_nav is not None:
+            c = ws.cell(row=r, column=COL_GROSS, value=result.gross_nav)
+            c.font, c.number_format = BLUE, NUM_FMT
+
+    ws.cell(row=r, column=COL_SOURCE, value=source_name)
+    ws.cell(row=r, column=COL_PAGE, value=page)
+    ws.cell(row=r, column=COL_UPDATED,
+            value=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    ws.cell(row=r, column=COL_FLAGS, value="; ".join(result.flags))
 
     wb.save(path)
