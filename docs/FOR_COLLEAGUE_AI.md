@@ -65,7 +65,25 @@ built for **Python 3.12**. Without OCR, a fully-scanned PDF yields a FAILED row 
 exactly that (never a crash); a partially-scanned one flags which pages were unreadable.
 A crashing OCR engine is caught per page and degrades to "unreadable page".
 
-**5. Historical: Account No was once a manual AI step.** The tool now reads account
+**5. UBS one-portfolio-per-PDF exports (2026-07-07, first live run).** The validated
+supervisor sample bundled all portfolios in one statement with "Portfolio NN" section
+headings. The colleague's real UBS files are exported one PDF per portfolio (e.g.
+`…0002` / `…0003` files): same asset-class table on the overview page, but NO
+"Portfolio NN" heading and no "Total … assets as of" header totals — so rows appeared
+with date + account number but empty values. Fix: when the heading is missing and the
+page has exactly one "Net assets" row, the parser reads that single table directly
+(and refuses to guess if several tables appear without headings). UBS Liabilities row
+is now captured too, powering the Gross + Liabilities − Net = 0 Check column. Swiss
+apostrophe thousands (1'234'567.89) also handled in `parse_amount`. Regression:
+`test_ubs_single_portfolio_statement` in `tests/test_failure_modes.py`.
+
+**6. When a layout still surprises us: `diagnose.bat`.** Dumps the text the tool sees
+in every inbox PDF to `logs/diagnose/*.txt` (`diagnose.bat UBS` = one bank). The user
+sends the .txt of the problem statement to Warren so the parser gets fixed against
+real wording, never guesses. Those dumps contain client data — they stay local and are
+shared person-to-person inside the firm only.
+
+**7. Historical: Account No was once a manual AI step.** The tool now reads account
 number, currency and statement date off each statement's header automatically. If you
 were asked to "fill in account numbers", that job no longer exists — check column B is
 already filled.

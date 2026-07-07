@@ -24,13 +24,21 @@ liabilities and therefore no "Gross assets" row — then Gross = Net, written
 into Excel as a formula (=Net cell) so the derivation is auditable.
 
 Also extracted: account no (the full portfolio number), currency
-("Valued in USD"), statement date, and Liquidity.
+("Valued in USD"), statement date, Liquidity, and Liabilities (which powers the
+same Gross + Liabilities - Net = 0 check column as BoS).
+
+UBS ALSO exports ONE PDF PER PORTFOLIO (seen on the colleague's real files,
+2026-07-07: e.g. `...0002`/`...0003` files for portfolios -02/-03). Those carry
+the same asset-class table on the overview page but with NO "Portfolio NN"
+heading. When the heading is missing and the page has exactly ONE "Net assets"
+row, that single table is read directly; if several tables appear without
+headings, the parser refuses to guess and flags it.
 """
 import re
 from typing import List, Optional
 
-from shared.extract import (find_row_norm, first_amount, group_lines, norm,
-                            page_of, search_norm, union_bbox)
+from shared.extract import (find_row_norm, find_rows_norm, first_amount,
+                            group_lines, norm, page_of, search_norm, union_bbox)
 from shared.model import ClientResult, FieldHit
 from shared.readers.pdf_reader import PdfReader, no_text_hint
 
@@ -61,7 +69,9 @@ def parse(pdf_path) -> List[ClientResult]:
     else:
         res.flags.append("Portfolio number not found in header")
 
-    hit = search_norm(lines, r"valuedin([a-z]{3})")
+    hit = (search_norm(lines, r"valuedin([a-z]{3})")
+           or search_norm(lines, r"(?:valuationcurrency|referencecurrency|"
+                                 r"accountcurrency):?([a-z]{3})"))
     if hit:
         res.currency = hit[1].group(1).upper()
 
@@ -80,10 +90,29 @@ def parse(pdf_path) -> List[ClientResult]:
     if section:
         _read_portfolio_table(res, section, suffix)
     else:
-        if suffix:
-            res.flags.append(f"'Portfolio {suffix}' table not found — "
-                             "fell back to the whole-relationship totals")
-        _read_relationship_totals(res, lines)
+        # Single-portfolio export: UBS also issues one PDF PER portfolio. Those
+        # carry the same asset-class table on the overview page but WITHOUT any
+        # "Portfolio NN" heading. Read that table directly — but only when it is
+        # unambiguous (exactly one Net assets row on the page).
+        net_rows = find_rows_norm(lines, "net assets", "total net assets")
+        if len(net_rows) == 1:
+            if suffix:
+                res.flags.append(
+                    f"No 'Portfolio {suffix}' section heading — read the page's "
+                    "single asset-class table (one-portfolio statement)")
+            _read_portfolio_table(res, lines, suffix or "")
+        elif len(net_rows) > 1:
+            res.flags.append(
+                f"'Portfolio {suffix}' heading not found and the page has "
+                f"{len(net_rows)} asset tables — can't tell which portfolio is "
+                "which; fell back to the whole-relationship totals. Run "
+                "diagnose.bat and send Warren the .txt for this statement.")
+            _read_relationship_totals(res, lines)
+        else:
+            if suffix:
+                res.flags.append(f"'Portfolio {suffix}' table not found — "
+                                 "fell back to the whole-relationship totals")
+            _read_relationship_totals(res, lines)
 
     if res.gross_nav is None and not res.gross_is_formula:
         res.flags.append("Gross NAV not found (check the portfolio table)")
@@ -121,9 +150,10 @@ def _portfolio_section(lines, suffix: str):
 def _read_portfolio_table(res: ClientResult, section, suffix: str) -> None:
     page = section[0]["page"]
 
-    gross_line = find_row_norm(section, "gross assets")
-    net_line = find_row_norm(section, "net assets")
-    liq_line = find_row_norm(section, "liquidity")
+    gross_line = find_row_norm(section, "gross assets", "total gross assets")
+    net_line = find_row_norm(section, "net assets", "total net assets")
+    liq_line = find_row_norm(section, "liquidity", "total liquidity")
+    liab_line = find_row_norm(section, "liabilities", "total liabilities")
 
     boxes = []
     if gross_line:
@@ -141,20 +171,28 @@ def _read_portfolio_table(res: ClientResult, section, suffix: str) -> None:
         if amt:
             res.liquidity, box = amt
             boxes.append((liq_line["x0"], liq_line["y0"], box[2], box[3]))
+    if liab_line:
+        amt = first_amount(liab_line)
+        if amt:
+            # enables the same Gross + Liabilities - Net = 0 check column as BoS
+            res.liabilities, box = amt
+            boxes.append((liab_line["x0"], liab_line["y0"], box[2], box[3]))
+
+    table_name = f"Portfolio {suffix}" if suffix else "The portfolio"
 
     # No liabilities in this portfolio -> UBS prints no 'Gross assets' row.
     # Gross = Net, and we write that as an Excel formula so it's auditable.
     if res.gross_nav is None and res.net_nav is not None and gross_line is None:
         res.gross_is_formula = True
         res.gross_nav = res.net_nav          # for the docx display
-        res.flags.append(f"Portfolio {suffix} shows no 'Gross assets' row "
+        res.flags.append(f"{table_name} shows no 'Gross assets' row "
                          "(no liabilities) — Gross set equal to Net by formula")
 
     if boxes:
         head = section[0]
         table_box = union_bbox(
             (head["x0"], head["y0"], head["x1"], head["y1"]), *boxes)
-        res.hits.append(FieldHit(f"Portfolio {suffix} table (Market value column)",
+        res.hits.append(FieldHit(f"{table_name} table (Market value column)",
                                  res.gross_nav, page, table_box))
 
 

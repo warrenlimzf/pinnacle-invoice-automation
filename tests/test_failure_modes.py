@@ -101,11 +101,47 @@ def test_scanned_without_ocr_names_the_cause(tmp: Path) -> None:
     print("PASS  scan without OCR -> flag names the cause")
 
 
+def test_ubs_single_portfolio_statement(tmp: Path) -> None:
+    """UBS also exports ONE PDF per portfolio: same asset-class table on the
+    overview page but with NO 'Portfolio NN' heading (colleague's real files,
+    2026-07-07). The parser must read that table instead of coming back empty."""
+    from banks.UBS.parser import parse
+    pdf = tmp / "ubs_single.pdf"
+    doc = fitz.open()
+    page = doc.new_page()
+    rows = [
+        "Total assets",
+        "Portfolio number 546-123456-02",
+        "Valued in USD",
+        "Assets as of 28.02.2026",
+        "Asset class Market value Accrued interest Total",
+        "Liquidity 2 866 000 1 500 2 867 500",
+        "Bonds 5 000 000 0 5 000 000",
+        "Gross assets 14 500 000 1 500 14 501 500",
+        "Liabilities -2 450 000 0 -2 450 000",
+        "Net assets 12 050 000 1 500 12 051 500",
+    ]
+    for i, text in enumerate(rows):
+        page.insert_text((72, 90 + i * 24), text, fontsize=10)
+    doc.save(str(pdf))
+    doc.close()
+
+    res = parse(pdf)[0]
+    assert res.account_no == "546-123456-02", res.account_no
+    assert res.currency == "USD", res.currency
+    assert res.gross_nav == 14_500_000, res.gross_nav
+    assert res.net_nav == 12_050_000, res.net_nav
+    assert res.liquidity == 2_866_000, res.liquidity
+    assert res.liabilities == -2_450_000, res.liabilities
+    print("PASS  UBS one-portfolio-per-PDF statement -> table read directly")
+
+
 def main() -> None:
     failures = 0
     for test in (test_encrypted_pdf_writes_failed_row,
                  test_ocr_crash_is_contained,
-                 test_scanned_without_ocr_names_the_cause):
+                 test_scanned_without_ocr_names_the_cause,
+                 test_ubs_single_portfolio_statement):
         try:
             test(_tmp_env())
         except Exception as exc:

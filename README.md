@@ -129,7 +129,8 @@ after deleting its row rebuilds exactly that row.
 | A row's flag starts with **FAILED — the PDF is password-protected** | Bank portals often lock PDFs with a password; a locked PDF can't be read by any tool. | Open the PDF with its password, **print/save it as a new PDF** (this removes the lock), drop the unlocked copy in. |
 | A row's flag says the PDF is **a scanned image and the OCR add-on isn't installed** | Setup was run without the OCR add-on, or on a Python other than 3.12. | Re-run `setup.bat` and answer **Y** to OCR (install Python 3.12 first if needed). Then just run again — failed files retry automatically. |
 | *"Permission"* / *"file is open"* message | Excel or Word has the output file open, so Windows blocks writing. | Close the file, drop the PDF in again (or re-run). |
-| A blank cell + a note in Flags | That figure's label wasn't found on the page — the tool never guesses. | Check the statement; if the bank truly changed its wording, the parser needs a small update. |
+| A blank cell + a note in Flags | That figure's label wasn't found on the page — the tool never guesses. | Check the statement; if the bank truly changed its wording, the parser needs a small update (see next row). |
+| A statement still extracts wrongly after all of the above | The bank uses a layout/wording the parser hasn't met yet. | Run **`diagnose.bat`** (or `diagnose.bat UBS` for one bank). It writes what the tool sees in each PDF to `logs\diagnose\*.txt` — send the .txt for the problem statement to the developer so the parser is fixed against real wording, not guesses. These dumps stay on your computer. |
 
 Full run log: `logs\automation.log` — every action and error is recorded there.
 

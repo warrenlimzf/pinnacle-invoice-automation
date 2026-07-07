@@ -9,8 +9,11 @@ each number came from into a per-bank Word doc for human eyeball verification.
 Real samples + the supervisor's guide live in `samples/` (**gitignored — client data,
 repo is public; never commit or upload**). Bank specifics (from her green-boxed guide):
 - **UBS** multi-portfolio: portfolio-number suffix (`546-123456-03`) picks the
-  "Portfolio 03" table; Gross assets/Net assets/Liquidity from the **Market value**
-  column; SPACE thousands. Header "Total gross/net assets" = whole relationship, wrong.
+  "Portfolio 03" table; Gross/Net/Liquidity/Liabilities from the **Market value**
+  column; SPACE (also apostrophe) thousands. Header "Total gross/net assets" = whole
+  relationship, wrong. ALSO exports one PDF PER portfolio (colleague's real files):
+  no "Portfolio NN" heading → read the page's single asset-class table (only if
+  exactly one "Net assets" row; refuse to guess otherwise).
 - **BoS** Gross = "Investment Assets"; Net = "Total Net Asset Value"; parentheses =
   negative (Net can be negative); Overdrafts captured + check formula Gross+Liab−Net=0.
 - **LGT** only Net ("Total" of allocation table); Gross = Excel formula adding back
@@ -32,7 +35,8 @@ Hardcoded = DARK BLUE font, formulas = BLACK.
 ## Layout (what each piece does)
 - `config.py` — ALL paths + the fee setting (`MGMT_FEE_RATE`). One place to tweak.
 - `watcher.py` — auto-trigger: watches the 3 inboxes, processes new PDFs.
-- `run_all_once.py` — manual one-shot processing.
+- `run_all_once.py` — manual one-shot processing. `diagnose.py`/`.bat` — dumps the
+  seen-text of inbox PDFs to `logs/diagnose/*.txt` (local) for layout debugging.
 - Launchers: `*.command` (Mac) + `*.bat` (Windows): setup / run_watcher / run_once.
 - `banks/<LGT|BoS|UBS>/parser.py` — the **3 distinct per-bank parsers** (real logic).
 - `shared/extract.py` — line grouping, number parsing (commas, space thousands,

@@ -3,6 +3,7 @@
 Handles the real-world number formats seen in the sample statements:
   - comma thousands + dot decimal     10,208,537.88   -1,109,240.85   (BoS, LGT)
   - SPACE thousands                   SGD 7 032 282                   (UBS)
+  - APOSTROPHE thousands (Swiss)      1'234'567.89
   - parentheses or leading minus for negatives
 """
 import re
@@ -37,7 +38,8 @@ def parse_amount(text: str) -> Optional[float]:
     if s.startswith("-"):
         neg, s = True, s[1:]
 
-    s = s.replace(" ", "").replace(",", "").replace("+", "").strip()
+    s = (s.replace(" ", "").replace(",", "").replace("+", "")
+          .replace("'", "").replace("’", "").strip())
     m = re.search(r"\d+(?:\.\d+)?", s)
     if not m:
         return None
@@ -187,6 +189,14 @@ def find_row_norm(lines: List[Dict], *labels: str,
             if lab == w or (startswith and lab.startswith(w)):
                 return line
     return None
+
+
+def find_rows_norm(lines: List[Dict], *labels: str) -> List[Dict]:
+    """EVERY line whose leading label equals one of `labels` (normalized).
+    Lets a parser check a match is unambiguous before trusting it."""
+    wanted = [norm(l) for l in labels]
+    return [line for line in lines
+            if norm(line_label(line)).strip(":*") in wanted]
 
 
 def find_line_norm_contains(lines: List[Dict], *needles: str) -> Optional[Dict]:
