@@ -9,11 +9,12 @@
   guarded; any parse failure now writes a visible **FAILED row** with the fix in Flags;
   failed files are not marked processed → auto-retry next run.
   `tests/test_failure_modes.py` (synthetic PDFs) locks all three modes in.
-- NEXT: she re-downloads the ZIP (or pulls) and re-runs `run_once.bat`. Either the tabs
-  populate, or the FAILED flag names the real cause (most likely password-protected UBS/LGT
-  downloads, or her 4–5 MB LGT files are full scans and setup skipped the OCR extras —
-  note OCR vendor wheels need Python 3.12). Her `logs\automation.log` has the old
-  tracebacks if we still need them.
+- CONFIRMED from her re-run (same day): OCR IS installed and working on her PC. Her LGT
+  files are full scans (20+ pages, ~10s OCR per page → 3–4 min per file); BoS has a text
+  layer → instant. The original empty tabs were almost certainly the window being closed
+  mid-OCR. Commit `56c8b4e` adds a "scanned statement, ~10s/page, NOT stuck — leave the
+  window open" log notice. She just lets a full run finish once; done files are hash-skipped
+  forever after.
 
 ## Done & VERIFIED against 5 REAL statements (2026-07-07, session 3)
 - 3 banks (LGT, BoS, UBS), each with `inbox/` + its own real `parser.py`.
