@@ -49,9 +49,13 @@ Hardcoded = DARK BLUE font, formulas = BLACK.
   OCR-crash / scan-without-OCR must each yield a visible **FAILED row** (flag says
   the fix), never a silently empty tab; failed files aren't marked processed → auto-retry.
 - `output/nav_master.xlsx` — generated. `logs/` — run log + snapshot PNGs.
-- `docs/RULEBOOK.md` — Warren's plain-English playbook incl. the mechanism-for-amateurs
-  section. `docs/EMAIL_TO_COLLEAGUE.md` — ready-to-send setup + daily-use email.
-- `docs/FOR_COLLEAGUE_AI.md` — SUPERSEDED (account no now auto-extracted).
+- `README.md` — the canonical GitHub-facing guide (colleague reads GitHub directly now:
+  combined steps where Python install is step 1 one-time and every update starts from
+  step 2, mechanism, troubleshooting of all known issues). Docs: `docs/RULEBOOK.md` —
+  deep plain-English playbook; `docs/FOR_COLLEAGUE_AI.md` — AI orientation for the
+  colleague's AI (reading order, hard rules, DEBUG JOURNAL of solved issues — append new
+  fixes there + STATUS.md). EMAIL_TO_COLLEAGUE / STATEMENT_SPEC_TEMPLATE deleted
+  2026-07-07 (superseded, Warren-authorized).
 
 ## Runtime / handoff facts
 - Colleague runs on **Windows** → `.bat` launchers (`.command` are Mac, ignored).

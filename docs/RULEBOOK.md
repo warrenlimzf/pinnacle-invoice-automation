@@ -8,7 +8,7 @@ tags: [pinnacle, automation, playbook, internal]
 > [!info] What this document is
 > The full plain-English explanation of how this tool works, written so Warren can
 > understand every moving part and teach the colleague from it. The short version
-> she actually receives lives in [[EMAIL_TO_COLLEAGUE]]. This is the deep version.
+> she actually uses is the repo's `README.md` on GitHub. This is the deep version.
 
 ## 1. What the tool does, in one breath
 
@@ -268,4 +268,4 @@ real statement). The output workbook is `output\nav_master.xlsx`.
 
 ---
 
-Related: [[EMAIL_TO_COLLEAGUE]] · [[FOR_COLLEAGUE_AI]] · [[STATUS]] · [[STATEMENT_SPEC_TEMPLATE]]
+Related: the repo `README.md` (canonical user guide) · [[FOR_COLLEAGUE_AI]] · [[STATUS]]

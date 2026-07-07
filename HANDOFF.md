@@ -1,5 +1,8 @@
 # Handoff — read this first (for the colleague and her AI)
 
+> **AI assistants:** your full orientation (reading order, hard rules, and the debug
+> journal of already-solved issues) is in **`docs/FOR_COLLEAGUE_AI.md`** — start there.
+
 This project automates reading **Gross NAV** and **Net NAV** off private-bank client
 statements (LGT, Bank of Singapore = BoS, UBS) so they don't have to be typed by hand.
 **Everything runs locally on this Windows PC. No file is ever uploaded anywhere.**
@@ -34,7 +37,10 @@ plain number so it doesn't break in the destination file.
 2. **Every day:** double-click **`run_watcher.bat`** and leave the window open.
 3. Drop a statement PDF into the matching folder:
    `banks\LGT\inbox\`, `banks\BoS\inbox\`, `banks\UBS\inbox\`.
-4. It processes within a second or two. Eyeball, then copy A:C into the master file.
+4. Text-based PDFs (BoS) process in a second or two. **Scanned statements (typically
+   LGT) take a few MINUTES each** — local OCR reads them at ~10s per page. The window
+   prints progress; it is not stuck. Leave it open until it says done.
+   Then eyeball, and copy the A:F block into the master file.
    - On-demand instead of watching? Use **`run_once.bat`**.
 5. **No need to delete old files** — already-processed files are skipped automatically
    (matched by content), so nothing duplicates. Just drop the new PDF in.
