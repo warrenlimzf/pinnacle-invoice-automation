@@ -9,6 +9,7 @@ no words. If the optional local OCR engine (RapidOCR) is installed, any page
 with no text is rendered to an image and read locally — nothing is uploaded
 anywhere. Without OCR installed, such pages are skipped with a clear log line.
 """
+from pathlib import Path
 from typing import Dict, List, Optional
 
 import fitz  # PyMuPDF
@@ -112,6 +113,7 @@ class PdfReader(StatementReader):
             info = {}
         info["no_text_pages"] = []
         items: List[Dict] = []
+        ocr_notice_shown = False
         doc = fitz.open(str(path))
         try:
             if doc.needs_pass and not doc.authenticate(""):
@@ -131,6 +133,12 @@ class PdfReader(StatementReader):
                             "x0": w[0], "y0": w[1], "x1": w[2], "y1": w[3],
                         })
                     continue
+                if not ocr_notice_shown and _get_ocr() is not None:
+                    ocr_notice_shown = True
+                    log.info(f"{Path(str(path)).name} is a scanned statement — "
+                             f"reading its {len(doc)} page(s) with local OCR. "
+                             "This takes ~10s per page (a long statement = a few "
+                             "minutes). NOT stuck — leave the window open.")
                 try:
                     ocr_items = _ocr_page_items(page, page_no)
                 except Exception:
