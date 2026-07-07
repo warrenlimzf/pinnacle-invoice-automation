@@ -12,8 +12,8 @@ repo is public; never commit or upload**). Bank specifics (from her green-boxed 
   "Portfolio 03" table; Gross/Net/Liquidity/Liabilities from the **Market value**
   column; SPACE (also apostrophe) thousands. Header "Total gross/net assets" = whole
   relationship, wrong. ALSO exports one PDF PER portfolio (colleague's real files):
-  no "Portfolio NN" heading → read the page's single asset-class table (only if
-  exactly one "Net assets" row; refuse to guess otherwise).
+  no "Portfolio NN" headings, client's own portfolio printed FIRST → read the FIRST
+  table (cut at the first "Net assets" row; flag for eyeball when several tables).
 - **BoS** Gross = "Investment Assets"; Net = "Total Net Asset Value"; parentheses =
   negative (Net can be negative); Overdrafts captured + check formula Gross+Liab−Net=0.
 - **LGT** only Net ("Total" of allocation table); Gross = Excel formula adding back

@@ -15,11 +15,13 @@
   mid-OCR. Commit `56c8b4e` adds a "scanned statement, ~10s/page, NOT stuck — leave the
   window open" log notice. She just lets a full run finish once; done files are hash-skipped
   forever after.
-- HER UBS FILES = one PDF PER portfolio (no "Portfolio NN" heading, no header totals) —
+- HER UBS FILES = one PDF PER portfolio (no "Portfolio NN" headings, no header totals) —
   rows got date + account no but empty values, flag said "'Portfolio 02' table not found".
-  Fixed same day: parser reads the page's single asset-class table when the heading is
-  absent and exactly one "Net assets" row exists (refuses to guess otherwise); UBS
-  Liabilities captured (Check column now works for UBS); apostrophe thousands handled;
+  Fixed same day; then refined per Warren: the client's own portfolio (named by the
+  suffix) is always printed FIRST, so with no heading the parser reads the FIRST table
+  (cut at the first "Net assets" row — never mixes tables; flags for eyeball when
+  several tables share the page); UBS Liabilities captured (Check column works for UBS);
+  apostrophe thousands handled;
   `diagnose.bat` added for any future layout surprise (dumps seen-text to
   logs/diagnose/*.txt to send Warren). Regression test added. She re-downloads the ZIP —
   fresh folder has no processed-index, so everything reprocesses.

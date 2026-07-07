@@ -136,12 +136,49 @@ def test_ubs_single_portfolio_statement(tmp: Path) -> None:
     print("PASS  UBS one-portfolio-per-PDF statement -> table read directly")
 
 
+def test_ubs_two_tables_takes_first(tmp: Path) -> None:
+    """When a heading-less UBS page shows SEVERAL asset tables, the client's own
+    portfolio is printed first (per the suffix) — read the FIRST table only and
+    never mix rows across tables."""
+    from banks.UBS.parser import parse
+    pdf = tmp / "ubs_two_tables.pdf"
+    doc = fitz.open()
+    page = doc.new_page()
+    rows = [
+        "Total assets",
+        "Portfolio number 546-123456-03",
+        "Valued in USD",
+        "Liquidity 1 000 000 0 1 000 000",
+        "Equities 9 000 000 0 9 000 000",
+        "Gross assets 10 000 000 0 10 000 000",
+        "Liabilities -1 000 000 0 -1 000 000",
+        "Net assets 9 000 000 0 9 000 000",
+        # a second portfolio's table further down, no heading either
+        "Liquidity 77 0 77",
+        "Gross assets 99 0 99",
+        "Net assets 98 0 98",
+    ]
+    for i, text in enumerate(rows):
+        page.insert_text((72, 90 + i * 24), text, fontsize=10)
+    doc.save(str(pdf))
+    doc.close()
+
+    res = parse(pdf)[0]
+    assert res.gross_nav == 10_000_000, res.gross_nav
+    assert res.net_nav == 9_000_000, res.net_nav
+    assert res.liquidity == 1_000_000, res.liquidity
+    assert res.liabilities == -1_000_000, res.liabilities
+    assert any("FIRST" in f for f in res.flags), res.flags
+    print("PASS  UBS several heading-less tables -> first table only, flagged")
+
+
 def main() -> None:
     failures = 0
     for test in (test_encrypted_pdf_writes_failed_row,
                  test_ocr_crash_is_contained,
                  test_scanned_without_ocr_names_the_cause,
-                 test_ubs_single_portfolio_statement):
+                 test_ubs_single_portfolio_statement,
+                 test_ubs_two_tables_takes_first):
         try:
             test(_tmp_env())
         except Exception as exc:

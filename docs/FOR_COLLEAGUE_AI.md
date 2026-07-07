@@ -68,14 +68,16 @@ A crashing OCR engine is caught per page and degrades to "unreadable page".
 **5. UBS one-portfolio-per-PDF exports (2026-07-07, first live run).** The validated
 supervisor sample bundled all portfolios in one statement with "Portfolio NN" section
 headings. The colleague's real UBS files are exported one PDF per portfolio (e.g.
-`…0002` / `…0003` files): same asset-class table on the overview page, but NO
-"Portfolio NN" heading and no "Total … assets as of" header totals — so rows appeared
-with date + account number but empty values. Fix: when the heading is missing and the
-page has exactly one "Net assets" row, the parser reads that single table directly
-(and refuses to guess if several tables appear without headings). UBS Liabilities row
-is now captured too, powering the Gross + Liabilities − Net = 0 Check column. Swiss
-apostrophe thousands (1'234'567.89) also handled in `parse_amount`. Regression:
-`test_ubs_single_portfolio_statement` in `tests/test_failure_modes.py`.
+`…0002` / `…0003` files): same asset-class table(s) on the overview page, but NO
+"Portfolio NN" headings and no "Total … assets as of" header totals — so rows appeared
+with date + account number but empty values. Per Warren: in these exports the client's
+own portfolio (the one the account-number suffix names) is always printed FIRST. Fix:
+when the heading is missing, read the FIRST table only — everything up to the first
+"Net assets" row, so rows are never mixed across tables — and flag for the eyeball
+check when several tables share the page. UBS Liabilities row is now captured too,
+powering the Gross + Liabilities − Net = 0 Check column. Swiss apostrophe thousands
+(1'234'567.89) also handled in `parse_amount`. Regression tests:
+`test_ubs_single_portfolio_statement` + `test_ubs_two_tables_takes_first`.
 
 **6. When a layout still surprises us: `diagnose.bat`.** Dumps the text the tool sees
 in every inbox PDF to `logs/diagnose/*.txt` (`diagnose.bat UBS` = one bank). The user

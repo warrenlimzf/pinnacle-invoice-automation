@@ -29,10 +29,12 @@ same Gross + Liabilities - Net = 0 check column as BoS).
 
 UBS ALSO exports ONE PDF PER PORTFOLIO (seen on the colleague's real files,
 2026-07-07: e.g. `...0002`/`...0003` files for portfolios -02/-03). Those carry
-the same asset-class table on the overview page but with NO "Portfolio NN"
-heading. When the heading is missing and the page has exactly ONE "Net assets"
-row, that single table is read directly; if several tables appear without
-headings, the parser refuses to guess and flags it.
+the same asset-class table(s) on the overview page but with NO "Portfolio NN"
+headings — and the client's own portfolio (the one the suffix names) is always
+printed FIRST. So when the heading is missing, the parser reads the FIRST
+table only (everything up to the first "Net assets" row, so rows are never
+mixed across tables) and flags it for the eyeball check when several tables
+share the page.
 """
 import re
 from typing import List, Optional
@@ -90,24 +92,28 @@ def parse(pdf_path) -> List[ClientResult]:
     if section:
         _read_portfolio_table(res, section, suffix)
     else:
-        # Single-portfolio export: UBS also issues one PDF PER portfolio. Those
-        # carry the same asset-class table on the overview page but WITHOUT any
-        # "Portfolio NN" heading. Read that table directly — but only when it is
-        # unambiguous (exactly one Net assets row on the page).
+        # No "Portfolio NN" heading printed. In UBS's per-portfolio exports the
+        # client's own portfolio is always the FIRST asset-class table on the
+        # page (suffix -03 -> Portfolio 03 listed first, etc. — the suffix names
+        # it but the heading isn't printed). So: read the FIRST table, i.e.
+        # everything up to and including the first "Net assets" row — never mix
+        # in rows from a table further down. The suffix stays in the account
+        # number and the docx snapshot shows exactly what was read, so the
+        # first-table assumption is checkable at a glance.
         net_rows = find_rows_norm(lines, "net assets", "total net assets")
-        if len(net_rows) == 1:
-            if suffix:
+        if net_rows:
+            first_table = lines[:lines.index(net_rows[0]) + 1]
+            if len(net_rows) > 1:
+                res.flags.append(
+                    f"No 'Portfolio {suffix}' heading; page shows "
+                    f"{len(net_rows)} asset tables — read the FIRST one "
+                    f"(portfolio {suffix} is listed first on these statements). "
+                    "Double-check against the snapshot in the Word doc.")
+            elif suffix:
                 res.flags.append(
                     f"No 'Portfolio {suffix}' section heading — read the page's "
                     "single asset-class table (one-portfolio statement)")
-            _read_portfolio_table(res, lines, suffix or "")
-        elif len(net_rows) > 1:
-            res.flags.append(
-                f"'Portfolio {suffix}' heading not found and the page has "
-                f"{len(net_rows)} asset tables — can't tell which portfolio is "
-                "which; fell back to the whole-relationship totals. Run "
-                "diagnose.bat and send Warren the .txt for this statement.")
-            _read_relationship_totals(res, lines)
+            _read_portfolio_table(res, first_table, suffix or "")
         else:
             if suffix:
                 res.flags.append(f"'Portfolio {suffix}' table not found — "
