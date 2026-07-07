@@ -1,5 +1,20 @@
 # STATUS
 
+## First live run on colleague's PC (2026-07-07, session 4) — fix shipped, awaiting her re-run
+- Her first real run: BoS wrote 6 rows fine; UBS and LGT tabs came out COMPLETELY empty
+  (not even flagged rows). Root cause class confirmed locally: any per-file exception in
+  the parser (proven triggers: password-protected PDF → PyMuPDF `ValueError: document
+  closed or encrypted`; OCR engine crash; full-scan PDF) was logged but wrote NO Excel row.
+- Fix (commit `a5ffceb`): encrypted PDFs detected with a plain-English error; OCR call
+  guarded; any parse failure now writes a visible **FAILED row** with the fix in Flags;
+  failed files are not marked processed → auto-retry next run.
+  `tests/test_failure_modes.py` (synthetic PDFs) locks all three modes in.
+- NEXT: she re-downloads the ZIP (or pulls) and re-runs `run_once.bat`. Either the tabs
+  populate, or the FAILED flag names the real cause (most likely password-protected UBS/LGT
+  downloads, or her 4–5 MB LGT files are full scans and setup skipped the OCR extras —
+  note OCR vendor wheels need Python 3.12). Her `logs\automation.log` has the old
+  tracebacks if we still need them.
+
 ## Done & VERIFIED against 5 REAL statements (2026-07-07, session 3)
 - 3 banks (LGT, BoS, UBS), each with `inbox/` + its own real `parser.py`.
 - Folder-watch trigger (`watcher.py`) + manual run (`run_all_once.py`).
