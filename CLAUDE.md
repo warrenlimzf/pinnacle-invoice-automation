@@ -74,7 +74,9 @@ Hardcoded = DARK BLUE font, formulas = BLACK.
   no `.venv` carried). She then runs `setup.bat` to build a fresh Windows `.venv`.
 
 ## Open (see docs/STATUS.md)
-- First live month on the colleague's own fresh statements.
+- AWAITING colleague's re-run on the latest ZIP (`fa6a820`): confirm UBS values fill
+  via the new first-table rule + LGT tab populated. If UBS still wrong → she runs
+  `diagnose.bat UBS`, sends the .txt → fix parser from real wording, never guess.
 - Multiple clients per PDF (parsers assume one account per PDF). Fee rule unset.
 
 ## Run (dev)
