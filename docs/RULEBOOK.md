@@ -13,10 +13,11 @@ tags: [pinnacle, automation, playbook, internal]
 ## 1. What the tool does, in one breath
 
 The colleague drops a bank statement PDF (LGT, Bank of Singapore, or UBS) into a folder.
-The tool reads the **Gross NAV** and **Net NAV** off that PDF, writes them into a master
-Excel, and saves a screenshot of the exact part of the PDF each number came from into a
-Word document. She opens the Excel and the Word side by side, checks the numbers match the
-screenshots, then copies the figures into her own master file.
+The tool finds the overview page inside the (often long) statement, reads the **statement
+date, account number, currency, Gross NAV, Net NAV and Liquidity** off it, writes them into
+a master Excel, and saves a screenshot of the exact part of the PDF each number came from
+into a Word document. She opens the Excel and the Word side by side, checks the numbers
+match the screenshots, then copies the figures into her own master file.
 
 Everything happens on her own computer. No file is ever sent to the internet. That is a
 hard rule, which is why the tool reads PDFs with a local library (PyMuPDF) instead of any
@@ -74,7 +75,7 @@ before clicking Install.
 
 The project lives on GitHub as a **public** repo, so she needs no account and no login:
 
-`https://github.com/WarrenLim1122/pinnacle-invoice-automation`
+`https://github.com/warrenlimzf/pinnacle-invoice-automation`
 
 The simplest route for a non-technical person: open the link, click the green **Code**
 button, choose **Download ZIP**, then right-click the downloaded file and **Extract All**.
@@ -89,7 +90,7 @@ button, choose **Download ZIP**, then right-click the downloaded file and **Extr
 If she prefers the command line and has Git installed, the equivalent is:
 
 ```bash
-git clone https://github.com/WarrenLim1122/pinnacle-invoice-automation.git
+git clone https://github.com/warrenlimzf/pinnacle-invoice-automation.git
 ```
 
 ## 5. The two files she ever touches
@@ -131,20 +132,87 @@ The instant a PDF appears in one of them, the watcher:
 ## 7. Reading and copying the results
 
 Open `output\nav_master.xlsx`. There is one tab per bank, and each row is one statement,
-identified by the PDF's filename in the "Source PDF" column.
+identified by the PDF's filename in the "Source PDF" column. The columns are ranked by
+importance, in the order the supervisor's guide lists them:
 
-Open the matching Word file next to it, for example `banks\LGT\LGT_verification.docx`. It holds
-the screenshots of where each number was read from. Glance across to confirm the figures match.
+| A | B | C | D | E | F |
+|---|---|---|---|---|---|
+| Statement Date | Account No | Currency | Gross NAV | Net NAV | Liquidity |
 
-Then copy the three-column block (**Account No | Gross NAV | Net NAV**) into her own master
-file, pasting **as values**. The Account No column is deliberately left blank, for her to fill
-on her own machine using her own AI, so account numbers never leave her PC. The how-to for
-that lives in [[FOR_COLLEAGUE_AI]].
+After F come the housekeeping columns: **Liabilities** and a **Check** cell (Bank of
+Singapore only — the check is a live formula, Gross + Liabilities − Net, which should show
+0.00), then Source PDF, Page, Updated At and Flags. For LGT, the negative line items that
+were added back sit further right (column N onwards), each with a comment naming the line
+item, feeding the Gross NAV formula.
+
+Open the matching Word file next to it, for example `banks\LGT\LGT_verification.docx`. It
+holds the screenshots of where each number was read from. Glance across to confirm the
+figures match.
+
+Then copy the **A to F block** into her own master file, pasting **as values**. The account
+number is now read straight off the statement header (LGT's "Client number", BoS's
+"Portfolio No.", UBS's "Portfolio number"), so there is no manual fill-in step any more.
 
 > [!tip] Colour code in the Excel
-> Numbers in **blue** are read straight off the PDF. Numbers in **black** are calculated by a
-> formula (this happens for LGT, where the Gross figure is built by adding back negative line
-> items). This is standard finance convention, blue for hardcoded, black for formula.
+> Numbers in **dark blue** are read straight off the PDF (hardcoded). Numbers in **black**
+> are calculated by a live formula you can click and audit. Formulas appear wherever a figure
+> was DERIVED rather than read: LGT's Gross NAV (Net plus the added-back negatives), any
+> Gross-equals-Net case, and the BoS check cell. This is standard finance convention.
+
+## 7b. How the engine actually reads a PDF (the mechanism, for non-programmers)
+
+Warren asked for the machinery to be written down in plain terms, so here it is.
+
+**A digital PDF already knows its own text.** When a bank generates a statement, the file
+stores every word along with its exact position on the page, like a map: "the word
+'Total' sits 105mm from the left, 260mm from the top." The tool uses a local library called
+**PyMuPDF** to read that map. It never "looks" at the page like a human; it asks the file
+directly for its words and their coordinates. That is also why the screenshots are possible:
+once the tool knows *where* a number sits, it can render just that rectangle of the page
+into an image for the Word doc.
+
+**Step 1 — find the right page.** Statements run to dozens of pages, but each bank has one
+overview page that carries everything we need. The tool walks page by page looking for that
+page's fingerprint: LGT's says "Asset allocation overview", BoS's has "Investment Assets"
+plus "Total Net Asset Value", UBS's has the "Portfolio number" header plus a "Gross assets"
+row. First page that matches wins; the rest of the document is ignored.
+
+**Step 2 — rebuild the table rows.** Words that sit at the same height on the page belong to
+the same visual row, so the tool groups them into lines: `Liquidity  95,000.00  48.67 % ...`.
+Each line splits into a **label** (the words before the first number) and its **numbers**,
+read left to right. The first number on a row is the one in the leftmost money column, which
+for all three banks is the current-month value we want.
+
+**Step 3 — apply each bank's rule.** This is the part that was tuned against the supervisor's
+green-boxed guide:
+
+- **LGT** — Net NAV is the "Total" row of the allocation table. Every NEGATIVE line item
+  (Credit, Derivatives, and so on) is collected, and Gross = Net with those added back, so
+  Gross is always at least Net. That arithmetic is written into Excel as a formula, not a
+  number, so it can be audited later. Liquidity is its own row in the same table.
+- **BoS** — Gross is the "Investment Assets" row, Net is "Total Net Asset Value". Negative
+  numbers print in parentheses, `(85,000.00)`, and the tool reads those as minus — an
+  overdrawn client genuinely has a negative Net. If a Liabilities/Overdrafts section exists
+  it is captured too, purely to power the check formula.
+- **UBS** — the trap here is that UBS bundles several portfolios into one statement. The
+  header's "Total gross/net assets" figures cover the WHOLE relationship, so they are the
+  wrong numbers. The portfolio number ends in a suffix, e.g. `546-123456-03`, and that
+  suffix names the one table to read: the tool finds the "Portfolio 03" section and takes
+  its "Gross assets", "Net assets" and "Liquidity" rows, always the **Market value** column
+  (the first number). Numbers use spaces as thousand separators (`14 500 000`), which the
+  tool re-joins.
+
+**Step 4 — the safety net for scanned PDFs.** Occasionally a PDF is really just a photograph
+of a page (a scan, or a screenshotted page saved as PDF) with no text stored inside. For
+those, the tool has an optional local **OCR** engine (RapidOCR): it renders the page to an
+image and recognises the characters, entirely on the machine, nothing uploaded. Statements
+downloaded from a bank portal normally never need this.
+
+**Why a "static" program can do this reliably:** each bank's format is standardised and does
+not change month to month. The tool never guesses — it anchors on the exact printed labels
+("Total Net Asset Value", "Gross assets", "Client number:"), and when a label is missing it
+writes a note in the Flags column instead of inventing a number. Every figure it does write
+is backed by a screenshot of the exact spot it came from, so a human stays the final check.
 
 ## 8. Re-doing a row (if she deletes something by mistake)
 
@@ -170,14 +238,20 @@ whatever is in the inboxes right now and then closes.
 
 ## 10. Things to watch for
 
-- **First real statements:** the parsers were tuned on sample layouts and verified against
-  synthetic PDFs that copy those layouts. They have not yet been proven on real-world
-  variations (multiple portfolios, multiple pages, Bank of Singapore with non-zero
-  liabilities). So for the first few real statements, check carefully against the screenshots.
+- **Validation status:** the parsers are now validated against five REAL statements supplied
+  by the supervisor (two LGT including one with add-backs, two BoS including an overdrawn
+  account with liabilities and a negative Net NAV, and a multi-portfolio UBS). Every figure
+  matched the supervisor's green-boxed guide to the cent, including through the OCR path.
+  The real samples stay in the local `samples/` folder (never committed — client data) and
+  `tests/validate_samples.py` re-checks all of them in one run.
 - **Excel or Word open:** if the master Excel or a bank's Word file is open when a PDF is
   dropped, the write fails. The tool logs a clear message; just close the file and re-drop.
-- **Account No still blank:** that is by design, not a bug. It is the one manual step, done on
-  her side.
+- **A blank cell + a note in Flags** means the tool could not find that figure's label on
+  the page. It never guesses. Check the statement, and if the bank genuinely changed its
+  wording, the parser needs a one-line update.
+- **Scanned/image-only PDFs** need the optional OCR add-on from `setup.bat`. Without it the
+  tool logs exactly that, and the fix is either to install the add-on or to re-download the
+  original statement from the bank portal.
 
 ## 11. Where the settings live
 

@@ -27,9 +27,13 @@ class AddBack:
 @dataclass
 class ClientResult:
     """Everything extracted from one statement PDF (one client / one account)."""
-    account_no: Optional[str] = None        # filled later by colleague's AI
+    account_no: Optional[str] = None        # read off the statement header
+    currency: Optional[str] = None          # e.g. "USD"
+    statement_date: Optional[str] = None    # as printed, e.g. "31.03.2026"
     gross_nav: Optional[float] = None
     net_nav: Optional[float] = None
+    liquidity: Optional[float] = None       # LGT + UBS (BoS doesn't show one)
+    liabilities: Optional[float] = None     # BoS only — for the audit check column
     addbacks: List[AddBack] = field(default_factory=list)   # LGT only
     gross_is_formula: bool = False          # LGT: Gross is an Excel formula
     hits: List[FieldHit] = field(default_factory=list)      # for screenshots

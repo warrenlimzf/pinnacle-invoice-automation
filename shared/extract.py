@@ -148,6 +148,69 @@ def amount_after_currency(line: Dict) -> Optional[Tuple[float, BBox]]:
 
 
 # --------------------------------------------------------------------------- #
+#  Normalized matching (OCR-safe)
+#
+#  OCR often glues words together ("Netassets", "Portfolionumber546-123456-03"),
+#  so every label comparison here strips ALL whitespace and lowercases both
+#  sides. "Net assets" and "Netassets" then match the same needle "netassets".
+# --------------------------------------------------------------------------- #
+def norm(text: str) -> str:
+    return re.sub(r"\s+", "", (text or "").lower())
+
+
+def page_of(lines: List[Dict], *anchors: str) -> Optional[int]:
+    """First page whose combined text contains ALL the anchor needles
+    (whitespace-insensitive). This is how a multi-page statement is narrowed
+    down to the one overview page that carries the NAV figures."""
+    pages: Dict[int, List[str]] = {}
+    for ln in lines:
+        pages.setdefault(ln["page"], []).append(ln["text"])
+    wanted = [norm(a) for a in anchors]
+    for page in sorted(pages):
+        blob = norm("".join(pages[page]))
+        if all(w in blob for w in wanted):
+            return page
+    return None
+
+
+def find_row_norm(lines: List[Dict], *labels: str,
+                  startswith: bool = False) -> Optional[Dict]:
+    """First line whose leading label (text before the first number) equals —
+    or, with startswith=True, begins with — one of `labels`, ignoring case,
+    whitespace, ':' and '*'."""
+    wanted = [norm(l) for l in labels]
+    for line in lines:
+        lab = norm(line_label(line)).strip(":*")
+        if not lab:
+            continue
+        for w in wanted:
+            if lab == w or (startswith and lab.startswith(w)):
+                return line
+    return None
+
+
+def find_line_norm_contains(lines: List[Dict], *needles: str) -> Optional[Dict]:
+    """First line whose full text contains one of `needles`, whitespace-insensitive."""
+    low = [norm(n) for n in needles]
+    for line in lines:
+        blob = norm(line["text"])
+        if any(n in blob for n in low):
+            return line
+    return None
+
+
+def search_norm(lines: List[Dict], pattern: str) -> Optional[Tuple[Dict, "re.Match"]]:
+    """Regex-search each line's whitespace-stripped lowercase text.
+    Returns (line, match) for the first hit."""
+    rx = re.compile(pattern)
+    for line in lines:
+        m = rx.search(norm(line["text"]))
+        if m:
+            return line, m
+    return None
+
+
+# --------------------------------------------------------------------------- #
 #  Line finders
 # --------------------------------------------------------------------------- #
 def find_line_label_eq(lines: List[Dict], *labels: str) -> Optional[Dict]:

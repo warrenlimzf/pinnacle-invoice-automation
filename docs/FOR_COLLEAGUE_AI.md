@@ -1,3 +1,10 @@
+# ⚠️ SUPERSEDED — the tool now fills Account No itself
+
+> As of 2026-07-07 the automation reads the account number, currency and statement
+> date straight off each statement's header (LGT "Client number", BoS "Portfolio No.",
+> UBS "Portfolio number"). Column B fills automatically and this AI step is no longer
+> needed. Kept only for reference.
+
 # Filling in the Account Numbers (for your colleague + her AI)
 
 The automation fills **Gross NAV** and **Net NAV** automatically. The **Account No**

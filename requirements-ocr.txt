@@ -1,0 +1,6 @@
+# OPTIONAL local OCR add-on — only needed for scanned / image-only PDFs
+# (statements downloaded from a bank portal normally have a text layer and
+# never touch this). Runs 100% locally via ONNX models bundled in the wheel;
+# nothing is uploaded anywhere.
+# Windows wheels for Python 3.12 are pre-bundled in vendor/.
+rapidocr-onnxruntime>=1.4

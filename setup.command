@@ -24,6 +24,10 @@ echo "Installing libraries..."
 python -m pip install --no-index --find-links vendor -r requirements.txt \
   || python -m pip install -r requirements.txt
 
+echo "Installing the OPTIONAL local OCR add-on (for scanned/image-only PDFs)..."
+python -m pip install -r requirements-ocr.txt \
+  || echo "OCR add-on not installed — fine unless a PDF is a scan/photo."
+
 echo ""
 echo "Setup complete. You can now double-click run_watcher.command"
 read -r -p "Press Enter to close..."

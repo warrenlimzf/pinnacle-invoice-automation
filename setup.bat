@@ -33,6 +33,23 @@ if errorlevel 1 (
 )
 
 echo.
+echo Installing the OPTIONAL local OCR add-on (reads scanned/image-only PDFs)...
+echo  (Skipping this is fine - normal statements downloaded from the bank
+echo   portal already contain selectable text and do not need OCR.)
+python -m pip install --no-index --find-links vendor -r requirements-ocr.txt
+if errorlevel 1 (
+    echo  Offline OCR install did not match this Python - trying the internet...
+    python -m pip install -r requirements-ocr.txt
+    if errorlevel 1 (
+        echo.
+        echo  OCR add-on NOT installed. Everything else still works.
+        echo  Only scanned/photographed PDFs would need it. To add it later,
+        echo  run this setup again while connected to the internet,
+        echo  ideally on Python 3.12.
+    )
+)
+
+echo.
 echo ===================================================================
 echo  Setup complete. You can now double-click  run_watcher.bat
 echo ===================================================================

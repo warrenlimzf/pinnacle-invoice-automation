@@ -38,7 +38,11 @@ def append_verification(docx_path, result: ClientResult,
 
     meta = doc.add_paragraph()
     meta.add_run("Account No: ").bold = True
-    meta.add_run(result.account_no or "(to be filled)")
+    meta.add_run(result.account_no or "(not found)")
+    meta.add_run("     Statement date: ").bold = True
+    meta.add_run(result.statement_date or "(not found)")
+    meta.add_run("     Currency: ").bold = True
+    meta.add_run(result.currency or "(not found)")
     meta.add_run(f"     Processed: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
     vals = doc.add_paragraph()
@@ -46,6 +50,12 @@ def append_verification(docx_path, result: ClientResult,
     vals.add_run(f"{_fmt(result.gross_nav)}     ")
     vals.add_run("Net NAV: ").bold = True
     vals.add_run(f"{_fmt(result.net_nav)}")
+    if result.liquidity is not None:
+        vals.add_run("     Liquidity: ").bold = True
+        vals.add_run(f"{_fmt(result.liquidity)}")
+    if result.liabilities is not None:
+        vals.add_run("     Liabilities: ").bold = True
+        vals.add_run(f"{_fmt(result.liabilities)}")
 
     if result.addbacks:
         doc.add_paragraph("Add-backs used to derive Gross NAV (LGT):").runs[0].bold = True

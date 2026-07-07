@@ -19,7 +19,7 @@ It is a one-time setup, then daily use is just dropping the PDFs into folders an
 Go to https://www.python.org/downloads/release/python-3120/ and download the "Windows installer (64-bit)". Run it. On the very first screen, **tick the box that says "Add python.exe to PATH"** before you click Install. That box matters, so please don't skip it.
 
 **2. Download the tool.**
-Open this link: https://github.com/WarrenLim1122/pinnacle-invoice-automation
+Open this link: https://github.com/warrenlimzf/pinnacle-invoice-automation
 Click the green **Code** button, then **Download ZIP**. Save it, then right-click the downloaded file and choose **Extract All** to unzip it. Put the unzipped folder somewhere easy like your Documents.
 
 **3. Run the setup file.**
@@ -39,7 +39,7 @@ Inside the folder there are three inbox folders. Drop each bank's PDF into its o
 The moment a PDF lands, the tool reads it and fills in the numbers automatically. Your original PDFs are never moved or deleted.
 
 **6. Check and copy.**
-Open `output\nav_master.xlsx`. There is one tab per bank. Next to it, open the matching Word file (for example `banks\LGT\LGT_verification.docx`), which holds a screenshot of the exact spot on the PDF each number came from. Glance at them side by side to confirm the numbers match the screenshots. Then copy the three columns (Account No, Gross NAV, Net NAV) into your own master file as values. The Account No column is left blank on purpose for you to fill in.
+Open `output\nav_master.xlsx`. There is one tab per bank. Next to it, open the matching Word file (for example `banks\LGT\LGT_verification.docx`), which holds a screenshot of the exact spot on the PDF each number came from. Glance at them side by side to confirm the numbers match the screenshots. Then copy the first six columns (Statement Date, Account No, Currency, Gross NAV, Net NAV, Liquidity) into your own master file, pasting **as values** (Paste Special → Values). Everything, including the account number, is filled in automatically now.
 
 ## A few handy things
 
@@ -48,7 +48,9 @@ Open `output\nav_master.xlsx`. There is one tab per bank. Next to it, open the m
 - **If the Excel or Word file is open when you drop a PDF,** the tool will tell you to close it. Just close the file and drop the PDF in again.
 - **To stop the tool:** close the black window. To start it again the next day, double-click `run_watcher.bat`.
 
-One thing to keep in mind: the tool was tuned on sample layouts, so for your first few real statements please do compare against the screenshots carefully, just to be sure it picked up the right figures.
+- **Blue vs black numbers in the Excel:** blue means the number was read straight off the PDF; black means it is a live formula the tool built (for example LGT's Gross NAV, which adds back the negative line items). When you paste into your master as values, both become plain numbers.
+
+The tool has been checked against real statements from all three banks (including a UBS statement with several portfolios and a Bank of Singapore account with an overdraft) and every figure matched. Still, for your first few real statements please do glance at the screenshots — you are the final check.
 
 Shout if anything is unclear and I'll walk you through it.
 

@@ -7,6 +7,8 @@ __pycache__/
 banks/*/inbox/*.pdf
 # sample figure crops kept locally for reference, not committed (may show real figures)
 invoice examples/
+# real client sample statements + supervisor's guide (local reference ONLY — repo is public)
+samples/
 banks/*/*_verification.docx
 output/*.xlsx
 logs/*.log

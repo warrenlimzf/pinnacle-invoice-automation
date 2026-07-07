@@ -15,15 +15,15 @@ re-checking), the colleague:
 
 So treat `nav_master.xlsx` / the `.docx` as scratch that gets overwritten each run.
 
-## The table she copies = 3 columns
-On every bank tab, the first three columns are exactly:
+## The table she copies = the first 6 columns
+On every bank tab, the first six columns are exactly:
 
-| Account No (A) | Gross NAV (B) | Net NAV (C) |
-|----------------|---------------|-------------|
+| Statement Date (A) | Account No (B) | Currency (C) | Gross NAV (D) | Net NAV (E) | Liquidity (F) |
+|--------------------|----------------|--------------|---------------|-------------|---------------|
 
-That A:C block is what she copies into her master file. (Columns to the right —
-Source PDF, Page, Updated At, Flags, and LGT's add-back detail — are only there to help
-her eyeball; she doesn't copy those.)
+That A:F block is what she copies into her master file. (Columns to the right —
+Liabilities + a zero-check for BoS, Source PDF, Page, Updated At, Flags, and LGT's
+add-back detail — are only there to help her eyeball; she doesn't copy those.)
 
 **When copying into the master file, paste as VALUES** (in Excel: Paste Special → Values).
 This matters because LGT's Gross NAV is a live formula; pasting as values turns it into a
@@ -42,23 +42,18 @@ plain number so it doesn't break in the destination file.
 The `.command` files next to the `.bat` files are the Mac versions — **ignore them on Windows.**
 
 ## What each bank does
-- **UBS / BoS** — Gross and Net NAV are read straight off the statement.
+- **UBS** — statements bundle several portfolios; the portfolio number's suffix (e.g.
+  `546-123456-03`) names the one table that gets read ("Portfolio 03"), always the Market
+  value column. Gross, Net and Liquidity come straight off that table.
+- **BoS** — Gross = "Investment Assets", Net = "Total Net Asset Value". Negatives print in
+  parentheses, and an overdrawn client can have a NEGATIVE Net — that is real, not a bug.
+  Any Overdrafts figure is captured with a formula check (Gross + Liabilities − Net = 0).
 - **LGT** — the statement shows only the Net NAV ("Total"). The tool finds the negative
   line items (e.g. Credit, Derivatives) and writes Gross NAV as a formula that adds them
   back. Each add-back cell is tagged with its name. (Blue = read off the PDF, Black = formula.)
 
-## 👉 NEXT TASK (for tomorrow) — add Account Numbers
-The tool fills Gross NAV and Net NAV. **Account No (column A) is intentionally left blank**
-because there's no account-number example yet. The next session's job:
-
-> Tell your AI (ChatGPT / Gemini, running on this computer) **where the account number sits
-> on each bank's PDF**, then have it read the account number from each statement and write
-> it into **column A** of the matching row in `output/nav_master.xlsx`. The result is the
-> finished 3-column table: **Account Number | Gross NAV | Net NAV**.
-
-The ready-to-use AI prompt and tips are in **`docs/FOR_COLLEAGUE_AI.md`**.
-If you instead tell Warren *where* the account number appears on each bank's statement,
-the Python can be updated to read it automatically and this AI step disappears entirely.
+Account number, currency and statement date are read off each statement's header
+automatically — there is no manual fill-in step.
 
 ## If something looks wrong
 - The **Flags** column in the Excel notes when a figure couldn't be found.
