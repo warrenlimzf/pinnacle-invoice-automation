@@ -9,7 +9,7 @@ no words. If the optional local OCR engine (RapidOCR) is installed, any page
 with no text is rendered to an image and read locally — nothing is uploaded
 anywhere. Without OCR installed, such pages are skipped with a clear log line.
 """
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import fitz  # PyMuPDF
 
@@ -18,6 +18,11 @@ from shared.logging_setup import get_logger
 from .base import StatementReader
 
 log = get_logger("pdf_reader")
+
+
+class PdfReadError(Exception):
+    """The PDF could not be read at all. The message ends up in the Excel
+    Flags column for the colleague to act on — keep it plain English."""
 
 _OCR_DPI = 300  # render resolution for OCR; 300 reads bank tables reliably
 
@@ -83,11 +88,37 @@ def _ocr_page_items(page, page_no: int) -> List[Dict]:
     return items
 
 
+def no_text_hint(info: Optional[Dict]) -> str:
+    """A flag suffix explaining unreadable pages, for when a parser can't find
+    its overview page. Empty string if every page was read fine."""
+    pages = (info or {}).get("no_text_pages") or []
+    if not pages:
+        return ""
+    pg = ", ".join(str(p) for p in pages)
+    if _ocr_import_failed:
+        return (f" — note: page {pg} of the PDF is a scanned image and the "
+                "optional OCR engine isn't installed. Re-run setup and include "
+                "OCR, or download a text-based copy of the statement.")
+    return (f" — note: page {pg} of the PDF is a scanned image that OCR "
+            "could not read. Try re-downloading the original statement.")
+
+
 class PdfReader(StatementReader):
-    def extract_text_items(self, path) -> List[Dict]:
+    def extract_text_items(self, path, info: Optional[Dict] = None) -> List[Dict]:
+        """All words with their rectangles. `info`, if given, is filled with
+        `no_text_pages`: 1-based pages that had no text layer AND could not be
+        OCR'd — so parsers can explain a missing overview page."""
+        if info is None:
+            info = {}
+        info["no_text_pages"] = []
         items: List[Dict] = []
         doc = fitz.open(str(path))
         try:
+            if doc.needs_pass and not doc.authenticate(""):
+                raise PdfReadError(
+                    "the PDF is password-protected. Open it in a PDF viewer "
+                    "(enter the password), print/save it as a new PDF, and "
+                    "drop that unlocked copy into the inbox instead")
             for page_no in range(len(doc)):
                 page = doc[page_no]
                 # get_text("words") -> list of (x0, y0, x1, y1, "word", block, line, word_no)
@@ -99,14 +130,31 @@ class PdfReader(StatementReader):
                             "page": page_no,
                             "x0": w[0], "y0": w[1], "x1": w[2], "y1": w[3],
                         })
-                else:
+                    continue
+                try:
                     ocr_items = _ocr_page_items(page, page_no)
-                    if ocr_items:
-                        log.info(f"page {page_no + 1} of {path} had no text layer — "
-                                 f"read it with local OCR instead")
+                except Exception:
+                    log.exception(f"OCR crashed on page {page_no + 1} of {path} — "
+                                  "treating the page as unreadable")
+                    ocr_items = []
+                if ocr_items:
+                    log.info(f"page {page_no + 1} of {path} had no text layer — "
+                             f"read it with local OCR instead")
                     items.extend(ocr_items)
+                else:
+                    info["no_text_pages"].append(page_no + 1)
         finally:
             doc.close()
+        if not items:
+            if _ocr_import_failed:
+                raise PdfReadError(
+                    "the whole PDF is a scanned image and the optional OCR "
+                    "engine isn't installed. Re-run setup and include OCR, or "
+                    "download a text-based copy of the statement from the bank portal")
+            raise PdfReadError(
+                "no readable text found in this PDF — it looks like a scanned "
+                "image that even OCR could not read. Try re-downloading the "
+                "original statement from the bank portal")
         return items
 
     def full_text(self, path) -> str:

@@ -58,7 +58,12 @@ def handle(bank: str, path: Path, force: bool = False) -> None:
         return
     try:
         log.info(f"[{bank}] processing {path.name}")
-        process_pdf(bank, path)
+        results = process_pdf(bank, path)
+        if any(r.failed for r in results):
+            # leave it un-marked so it is retried automatically next time
+            log.error(f"[{bank}] {path.name} could not be read — see the "
+                      "Flags column in the Excel for what to do")
+            return
         mark_processed(path)
         log.info(f"[{bank}] done: {path.name}")
     except PermissionError:

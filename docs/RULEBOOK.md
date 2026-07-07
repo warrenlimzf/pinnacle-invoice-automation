@@ -252,6 +252,13 @@ whatever is in the inboxes right now and then closes.
 - **Scanned/image-only PDFs** need the optional OCR add-on from `setup.bat`. Without it the
   tool logs exactly that, and the fix is either to install the add-on or to re-download the
   original statement from the bank portal.
+- **A row whose Flags column starts with "FAILED"** means that PDF could not be read at all,
+  and the flag text says why and what to do. The two usual causes: the PDF is
+  password-protected (open it with the password, print/save it as a new PDF, drop the
+  unlocked copy in), or the whole PDF is a scanned image and the OCR add-on isn't installed.
+  Failed files are retried automatically on every run, so after fixing the cause she just
+  runs the tool again — no special steps. A bank tab can never be silently empty: every PDF
+  the tool touches gets a row, even when reading it failed.
 
 ## 11. Where the settings live
 

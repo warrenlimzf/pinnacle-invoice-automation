@@ -39,3 +39,4 @@ class ClientResult:
     hits: List[FieldHit] = field(default_factory=list)      # for screenshots
     flags: List[str] = field(default_factory=list)          # data-quality notes
     source_pdf: str = ""
+    failed: bool = False    # parse crashed — row shows FAILED; retry next run

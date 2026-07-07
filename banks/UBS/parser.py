@@ -32,11 +32,12 @@ from typing import List, Optional
 from shared.extract import (find_row_norm, first_amount, group_lines, norm,
                             page_of, search_norm, union_bbox)
 from shared.model import ClientResult, FieldHit
-from shared.readers.pdf_reader import PdfReader
+from shared.readers.pdf_reader import PdfReader, no_text_hint
 
 
 def parse(pdf_path) -> List[ClientResult]:
-    all_lines = group_lines(PdfReader().extract_text_items(pdf_path))
+    read_info = {}
+    all_lines = group_lines(PdfReader().extract_text_items(pdf_path, read_info))
     res = ClientResult(source_pdf=str(pdf_path))
 
     # ---- find the overview page in a multi-page statement -------------------
@@ -44,7 +45,8 @@ def parse(pdf_path) -> List[ClientResult]:
     if page is None:
         page = page_of(all_lines, "total gross assets")
     if page is None:
-        res.flags.append("Could not find the 'Total assets' overview page")
+        res.flags.append("Could not find the 'Total assets' overview page"
+                         + no_text_hint(read_info))
         return [res]
     lines = [ln for ln in all_lines if ln["page"] == page]
 

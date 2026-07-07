@@ -13,6 +13,7 @@ from shared.docx_writer import append_verification
 from shared.excel_writer import write_result
 from shared.logging_setup import get_logger
 from shared.model import ClientResult
+from shared.readers.pdf_reader import PdfReadError
 from shared.snapshot import snapshot_region
 
 log = get_logger("process")
@@ -24,7 +25,18 @@ def _bank_parser(bank: str):
 
 def process_pdf(bank: str, pdf_path) -> List[ClientResult]:
     pdf_path = Path(pdf_path)
-    results: List[ClientResult] = _bank_parser(bank).parse(pdf_path)
+    # A parser crash must never leave the Excel silently empty — write a FAILED
+    # row instead, so the colleague sees the file AND the reason in one place.
+    try:
+        results: List[ClientResult] = _bank_parser(bank).parse(pdf_path)
+    except Exception as exc:
+        log.exception(f"[{bank}] failed to read {pdf_path.name}")
+        reason = (str(exc) if isinstance(exc, PdfReadError)
+                  else f"unexpected error ({type(exc).__name__}: {exc})")
+        res = ClientResult(source_pdf=str(pdf_path), failed=True)
+        res.flags.append(f"FAILED — {reason}. Fix that, then simply run again — "
+                         "failed files are retried automatically.")
+        results = [res]
     snap_dir = config.SNAPSHOT_DIR / bank
 
     for res in results:

@@ -32,8 +32,13 @@ def main(argv):
                 continue
             try:
                 log.info(f"[{bank}] processing {pdf.name}")
-                process_pdf(bank, pdf)
-                mark_processed(pdf)
+                results = process_pdf(bank, pdf)
+                if any(r.failed for r in results):
+                    # leave it un-marked so the next run retries it automatically
+                    log.error(f"[{bank}] {pdf.name} could not be read — see the "
+                              "Flags column in the Excel for what to do")
+                else:
+                    mark_processed(pdf)
                 total += 1
             except PermissionError:
                 log.error(f"[{bank}] Close the Excel/Word file first, then re-run. ({pdf.name})")

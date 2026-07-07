@@ -45,6 +45,9 @@ Hardcoded = DARK BLUE font, formulas = BLACK.
 - `shared/docx_writer.py` — per-bank verification `.docx` (values + add-backs + snapshots).
 - `shared/snapshot.py` — renders a PDF section to PNG.
 - `tests/validate_samples.py` — run after ANY parser change; needs local `samples/`.
+- `tests/test_failure_modes.py` — synthetic PDFs, runs anywhere: encrypted /
+  OCR-crash / scan-without-OCR must each yield a visible **FAILED row** (flag says
+  the fix), never a silently empty tab; failed files aren't marked processed → auto-retry.
 - `output/nav_master.xlsx` — generated. `logs/` — run log + snapshot PNGs.
 - `docs/RULEBOOK.md` — Warren's plain-English playbook incl. the mechanism-for-amateurs
   section. `docs/EMAIL_TO_COLLEAGUE.md` — ready-to-send setup + daily-use email.

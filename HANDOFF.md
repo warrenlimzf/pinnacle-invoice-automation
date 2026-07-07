@@ -56,5 +56,8 @@ Account number, currency and statement date are read off each statement's header
 automatically — there is no manual fill-in step.
 
 ## If something looks wrong
-- The **Flags** column in the Excel notes when a figure couldn't be found.
+- The **Flags** column in the Excel notes when a figure couldn't be found. A flag starting
+  with **FAILED** means the PDF couldn't be read at all (most often: it is password-protected,
+  or it is a full-page scan and the OCR add-on isn't installed) — the flag text says the fix,
+  and the file is retried automatically on the next run.
 - Full run log: `logs\automation.log`.

@@ -29,14 +29,15 @@ from typing import List
 from shared.extract import (find_row_norm, first_amount, group_lines,
                             page_of, search_norm)
 from shared.model import ClientResult, FieldHit
-from shared.readers.pdf_reader import PdfReader
+from shared.readers.pdf_reader import PdfReader, no_text_hint
 
 _MONTHS = ("january", "february", "march", "april", "may", "june", "july",
            "august", "september", "october", "november", "december")
 
 
 def parse(pdf_path) -> List[ClientResult]:
-    all_lines = group_lines(PdfReader().extract_text_items(pdf_path))
+    read_info = {}
+    all_lines = group_lines(PdfReader().extract_text_items(pdf_path, read_info))
     res = ClientResult(source_pdf=str(pdf_path))
 
     # ---- find the overview page in a multi-page statement -------------------
@@ -44,7 +45,8 @@ def parse(pdf_path) -> List[ClientResult]:
     if page is None:
         page = page_of(all_lines, "assets", "total net asset value")
     if page is None:
-        res.flags.append("Could not find the 'Portfolio Distribution' overview page")
+        res.flags.append("Could not find the 'Portfolio Distribution' overview "
+                         "page" + no_text_hint(read_info))
         return [res]
     lines = [ln for ln in all_lines if ln["page"] == page]
 
