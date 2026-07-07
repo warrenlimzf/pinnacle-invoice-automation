@@ -74,6 +74,11 @@ Hardcoded = DARK BLUE font, formulas = BLACK.
   no `.venv` carried). She then runs `setup.bat` to build a fresh Windows `.venv`.
 
 ## Open (see docs/STATUS.md)
+- **V2 sibling exists (2026-07-07, mentor's request):** `../pinnacle-invoice-automation-api`
+  (GitHub `warrenlimzf/pinnacle-invoice-automation-api`) — same tool, scanned pages read
+  via the company's Gemini API instead of RapidOCR. THIS repo stays the recommended
+  local-only version and stays as-is; shared-logic fixes must be applied to both repos
+  separately (siblings, not linked).
 - AWAITING colleague's re-run on the latest ZIP (`fa6a820`): confirm UBS values fill
   via the new first-table rule + LGT tab populated. If UBS still wrong → she runs
   `diagnose.bat UBS`, sends the .txt → fix parser from real wording, never guess.
