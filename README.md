@@ -118,12 +118,25 @@ next run. Every number that *is* written has a screenshot proving where it came 
 name — old files are never re-processed, nothing duplicates, and re-dropping a file
 after deleting its row rebuilds exactly that row.
 
+**Which files were read — and which weren't.** Statements are read strictly **one at a
+time**: a single unreadable file never blocks the others, and a file already written to
+the Excel is never read again (that is what makes repeat runs instant and stops re-running
+the slow OCR on a page it already read). So you never have to wonder what did or didn't go
+in: after **every** run the tool writes **`output\NEEDS_REUPLOAD.txt`**. If everything read
+cleanly it says so; otherwise it lists each file that did **not** make it into the Excel,
+the reason, and the fix — **remove that file from its inbox folder, sort out the cause,
+then drop the corrected copy back into the same folder.** The same list is printed in the
+run window. (Under the hood two small records sit next to the tool — `processed_index.json`
+for files that are done, `failed_index.json` for files still needing attention — but you
+never open those; the `.txt` is the human-readable view.)
+
 ---
 
 ## Troubleshooting — every problem seen so far, and the fix
 
 | What you see | What it means | What to do |
 |---|---|---|
+| **Some statements are missing from the Excel** after a run | One or more files couldn't be read that run — they're never dropped silently. | Open **`output\NEEDS_REUPLOAD.txt`**: it names each file that wasn't read, the reason, and the fix. Remove and re-drop **only** those files — everything already in the Excel stays put. |
 | Lines like *"page N … had no text layer — read it with local OCR instead"* | **Not an error.** That statement is a scan; OCR is reading it at ~10s/page. | Wait. Leave the window open until "done". |
 | A bank tab in the Excel is empty | The window was closed mid-OCR (scans take minutes), so those files never finished. | Run again and let it finish. Current versions also print a "NOT stuck — leave the window open" notice. |
 | A row's flag starts with **FAILED — the PDF is password-protected** | Bank portals often lock PDFs with a password; a locked PDF can't be read by any tool. | Open the PDF with its password, **print/save it as a new PDF** (this removes the lock), drop the unlocked copy in. |
