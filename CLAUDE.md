@@ -29,6 +29,12 @@ Hardcoded = DARK BLUE font, formulas = BLACK.
   De-duplication is by content hash in `processed_index.json`, not by moving files.
   Re-do: a freshly (re)dropped PDF force-reprocesses (overwrites its row); startup
   catch-up still skips already-done files. `run_all_once.py --redo` rebuilds all.
+- **Read tracking (2026-07-08):** files are read one at a time; already-done files
+  are never re-read. Two records sit at root — `processed_index.json` (done) +
+  `failed_index.json` (couldn't-read + reason) — and every run (re)writes
+  `output/NEEDS_REUPLOAD.txt`, the plain-English "remove & re-upload these" report,
+  also printed to the run window. Failed files still auto-retry. Same feature lives
+  in the V2 sibling (applied separately). Both gitignored.
 - Builds on Mac, **runs on Windows**. Keep all code cross-platform (use `pathlib`,
   no hard-coded `/` or `\` paths). The `.bat` files are the Windows entry points.
 
@@ -44,6 +50,8 @@ Hardcoded = DARK BLUE font, formulas = BLACK.
 - `shared/readers/pdf_reader.py` — PyMuPDF text layer; local OCR fallback (RapidOCR,
   optional) for image-only pages.
 - `shared/fees.py` — LGT Gross-from-add-backs. `shared/process.py` — the glue.
+- `shared/index.py` — read memory: processed/failed records + `collect_unread()` /
+  `write_reupload_report()` (writes `output/NEEDS_REUPLOAD.txt`).
 - `shared/excel_writer.py` — master workbook; blue=hardcoded, black=formula; upsert by
   filename; BoS liabilities + check column; LGT add-backs from col N.
 - `shared/docx_writer.py` — per-bank verification `.docx` (values + add-backs + snapshots).
